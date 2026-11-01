@@ -13,11 +13,11 @@ Build a working connection between a vision-language model (VLM) and a 3D gaming
 | Assignment requirement | Proposed implementation | Evidence to collect |
 | --- | --- | --- |
 | Set up Unity or Unreal with a moving agent | Unity habitat scene with a navigable robot | Scene overview and recorded robot movement |
-| Set up a VLM front end | In-scene instruction interface connected to a Python service and a vision-capable model | User instruction, captured image, and model response |
-| Map VLM output to movement commands | Typed, allowlisted action contract and Unity action dispatcher | Validated JSON mapped to controller operations |
-| Receive output, map it, and move an agent | HTTP decision loop with execution feedback and new observations | End-to-end pick-and-place demonstration and logs |
+| Set up a VLM front end | Unity instruction interface connected through a Python service to an image-capable model (Llama 3.2 Vision is the initial candidate) | User instruction, actual captured image, and model response |
+| Map VLM output to movement commands | Typed, allowlisted action contract mapped by the Unity action dispatcher to robot controller operations | Validated action proposal and corresponding controller operation |
+| Receive VLM output in the 3D environment and move the agent | Unity receives the model's action proposal, checks it against current scene state, executes it, and reports the result in the next observation | End-to-end pick-and-place demonstration and correlated request/action logs |
 
-The example mentions VLA behavior, but this project will implement a **VLM-driven action pipeline**, not train or claim to use an end-to-end vision-language-action policy. The distinction must remain explicit in the report.
+The Unity interface is the user-facing VLM front end; the Python service connects it to the vision-capable model. The example mentions VLA behavior, but this project will implement a **VLM-driven action pipeline**, not train or claim to use an end-to-end vision-language-action policy. The distinction must remain explicit in the report.
 
 A text-only Llama model is insufficient for the visual component. The selected model must accept an actual scene image together with the instruction.
 
@@ -73,13 +73,16 @@ If the initial model is too large or slow, evaluate a smaller image-capable mode
 ```mermaid
 flowchart TD
     User[User instruction] --> UI[Unity task interface]
-    UI --> Capture[Camera image and execution state]
+    UI --> Capture[Unity captures image and execution state]
     Capture --> API[FastAPI POST /step]
     API --> Model[Vision model through Ollama]
-    Model --> Validator[Response parsing and validation]
-    Validator --> Dispatcher[Unity action dispatcher]
+    Model --> Validator[Backend parses and validates proposal]
+    Validator --> Response[FastAPI returns one action proposal]
+    Response --> UnityCheck[Unity checks correlation and current scene state]
+    UnityCheck --> Dispatcher[Unity action dispatcher]
     Dispatcher --> Controller[Navigation and manipulation]
     Controller --> Result[Action result and updated scene]
+    Result --> UI
     Result --> Capture
     UI --> Cancel[Local cancellation]
     Cancel --> Controller
