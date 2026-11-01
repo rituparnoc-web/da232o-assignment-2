@@ -6,7 +6,7 @@ Build a working connection between a vision-language model (VLM) and a 3D gaming
 
 **Primary demonstration:** "Pick up the blue container and place it on the delivery platform."
 
-**Planning status:** No implementation exists yet. The software versions, hardware capacity, model performance, and development tools listed below must be verified during setup. Checkboxes represent planned work, not completed functionality.
+**Implementation status:** The initial Python backend contract and `/health` and `/step` endpoints are implemented with mocked-model tests. Unity integration and real Ollama inference are not yet implemented or verified. The software versions, hardware capacity, model performance, and development tools listed below must be verified during setup. Checkboxes represent planned work, not completed functionality.
 
 ## 2. Assignment Coverage
 
