@@ -16,6 +16,8 @@ const stepCount = byId("step-count");
 const roverState = byId("rover-state");
 const instruction = byId<HTMLTextAreaElement>("instruction");
 const runButton = byId<HTMLButtonElement>("run-mission");
+const runLabel = byId("run-label");
+const runIcon = byId("run-icon");
 const stopButton = byId<HTMLButtonElement>("stop-mission");
 const targetList = byId("target-list");
 let selectedTarget = "object_01";
@@ -51,6 +53,13 @@ function logEvent(message: string, kind = "normal"): void {
 function setSceneStatus(text: string, active = false): void {
   sceneState.textContent = text.toUpperCase();
   sceneState.parentElement?.classList.toggle("is-active", active);
+}
+
+function setRunButtonBusy(busy: boolean): void {
+  runButton.disabled = busy;
+  runButton.classList.toggle("is-loading", busy);
+  runLabel.textContent = busy ? "ASKING QWEN" : "ASK VLM";
+  runIcon.textContent = busy ? "" : "▶";
 }
 
 function syncWorldReadout(): void {
@@ -146,7 +155,7 @@ async function runMission(): Promise<void> {
   const sessionId = crypto.randomUUID();
   const expectedTargetId = expectedTargetFor(taskText);
   currentAbort = new AbortController();
-  runButton.disabled = true;
+  setRunButtonBusy(true);
   stopButton.disabled = false;
   instruction.disabled = true;
   byId("last-decision").textContent = "PENDING";
@@ -160,17 +169,27 @@ async function runMission(): Promise<void> {
       stepCount.textContent = String(currentStep).padStart(2, "0");
       setSceneStatus(observationId === 0 ? "vision request" : "next decision", true);
       const requestId = crypto.randomUUID();
-      const response = await requestAction({
-        session_id: sessionId,
-        request_id: requestId,
-        observation_id: observationId,
-        instruction: taskText,
-        image_media_type: "image/jpeg",
-        image_base64: world.captureJpeg(),
-        visible_targets: world.getVisibleTargets(),
-        held_object_id: world.getHeldObjectId(),
-        previous_action_result: previousActionResult,
-      }, currentAbort.signal);
+      const requestStartedAt = Date.now();
+      const requestTimer = window.setInterval(() => {
+        const elapsedSeconds = Math.floor((Date.now() - requestStartedAt) / 1000);
+        setSceneStatus(`VLM / ${elapsedSeconds}s`, true);
+      }, 1000);
+      let response: StepResponse;
+      try {
+        response = await requestAction({
+          session_id: sessionId,
+          request_id: requestId,
+          observation_id: observationId,
+          instruction: taskText,
+          image_media_type: "image/jpeg",
+          image_base64: world.captureJpeg(),
+          visible_targets: world.getVisibleTargets(),
+          held_object_id: world.getHeldObjectId(),
+          previous_action_result: previousActionResult,
+        }, currentAbort.signal);
+      } finally {
+        window.clearInterval(requestTimer);
+      }
 
       if (response.session_id !== sessionId || response.request_id !== requestId || response.observation_id !== observationId) {
         throw new Error("Rejected stale or mismatched model response.");
@@ -247,7 +266,7 @@ async function runMission(): Promise<void> {
     if (thisRun === activeRun) {
       running = false;
       currentAbort = null;
-      runButton.disabled = false;
+      setRunButtonBusy(false);
       stopButton.disabled = true;
       instruction.disabled = false;
       syncWorldReadout();
@@ -263,7 +282,7 @@ function stopMission(): void {
   currentAbort = null;
   world.stopMovement();
   running = false;
-  runButton.disabled = false;
+  setRunButtonBusy(false);
   stopButton.disabled = true;
   instruction.disabled = false;
   setSceneStatus("cancelled");
