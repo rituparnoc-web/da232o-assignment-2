@@ -1,13 +1,17 @@
-# da232o-assignment-2
+# DA232O Assignment 2
 
-## Backend (Initial Implementation)
+## Browser 3D Prototype
 
-The first implementation slice is the Python service boundary. It validates image-bearing observations, calls an Ollama vision model, parses exactly one action from the permitted schema, and checks the action target against the current visible-target allowlist. It does not yet include a Unity project or a real-model end-to-end demo.
+The project now uses a browser-based Three.js habitat rather than installing a local game engine. The rover can navigate around obstacles, pick up containers, place them on a delivery platform, and be controlled manually or through a real Qwen2.5-VL request. The browser captures the live WebGL canvas and sends it to the Python API.
+
+The assignment text names Unity or Unreal. This browser-engine alternative needs instructor acceptance before submission.
 
 ### Prerequisites
 
-- Python 3.12 or newer
-- Ollama with an image-capable model available locally; the default model tag is `llama3.2-vision:11b`
+- Python 3.12+
+- Node.js 20.19+ and npm
+- Ollama with `qwen2.5vl:3b` available locally
+- A browser with WebGL enabled
 
 ### Install and Test
 
@@ -19,15 +23,63 @@ Push-Location backend
 ..\.venv\Scripts\python.exe -m pip install -e ".[test]"
 ..\.venv\Scripts\python.exe -m pytest
 Pop-Location
+
+Push-Location web
+npm install
+npm run build
+Pop-Location
 ```
 
-### Run the API
+### Run the Application
 
-Start Ollama and make sure the configured vision model is available. The backend defaults to `http://127.0.0.1:11434` and `llama3.2-vision:11b`; configure `OLLAMA_URL`, `VLM_MODEL`, or `VLM_TIMEOUT_SECONDS` in the environment when needed.
+After installing, use three separate PowerShell terminals. First, make sure the vision model is installed:
+
+```powershell
+& "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" pull qwen2.5vl:3b
+```
+
+In **Terminal 1**, start Ollama if the desktop app is not already serving requests. If `ollama` is on PATH, use `ollama serve`; otherwise run:
+
+```powershell
+& "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" serve
+```
+
+In **Terminal 2**, start the backend:
 
 ```powershell
 Push-Location backend
 ..\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-`GET http://127.0.0.1:8000/health` reports API health separately from model readiness. `POST http://127.0.0.1:8000/step` accepts the strict observation contract in `backend/app/schemas.py`. Model or validation failures return structured errors and never a fallback action.
+In **Terminal 3**, start the browser app:
+
+```powershell
+Push-Location web
+npm run dev -- --port 5173
+```
+
+Open <http://127.0.0.1:5173/>. Check API/model readiness from another PowerShell terminal with:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/health
+```
+
+The result should show `model_ready: true`. `POST /step` accepts the strict image-bearing observation contract. Set `VITE_API_BASE_URL` to change the browser API address. The backend only allows the two localhost Vite origins by default.
+
+The **Ask VLM** action captures the current scene and sends it with the instruction, visible IDs/categories, interaction-range flags, carry state, and previous result. A validated `pick_up` proposal selects the target; the browser controller then performs a bounded approach/pickup/delivery sequence and independently verifies the scene. The **Manual dispatch** buttons and rover steering provide a deterministic control path for testing.
+
+### Verification
+
+- 22 backend tests pass.
+- `npm run build` succeeds.
+- Desktop and 375 px mobile layouts render without horizontal overflow.
+- A real browser-to-Ollama run selected `object_01`, moved the rover, delivered the blue tote, and reached `VERIFIED`.
+
+Qwen2.5-VL 3B is the verified model. A cold response has ranged from about 29 to 106 seconds on this machine. Llama 3.2 Vision is installed but incompatible with the local Ollama runner (`unknown model architecture: mllama`). The browser scene uses generated geometry and labels; Unity/Unreal assignment acceptance remains unconfirmed.
+
+### Troubleshooting
+
+- If the header reports `API OFFLINE`, confirm the backend is listening at `127.0.0.1:8000` and check `GET /health`.
+- If the model is not ready, start Ollama and confirm `ollama list` includes `qwen2.5vl:3b`.
+- If a model request times out, allow additional time for cold inference or set `VLM_TIMEOUT_SECONDS` before starting the backend.
+- If the 3D view is blank, use a browser with WebGL and hardware acceleration enabled.

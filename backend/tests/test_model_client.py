@@ -7,7 +7,7 @@ from uuid import uuid4
 import httpx
 from PIL import Image
 
-from app.model_client import OllamaModelClient
+from app.model_client import OllamaModelClient, action_target_ids, allowed_actions
 from app.schemas import StepRequest
 from app.settings import Settings
 
@@ -46,9 +46,33 @@ def test_ollama_request_contains_actual_image_and_returns_parsed_action():
 
     proposal, inference_ms = asyncio.run(run_test())
 
-    assert captured_request["model"] == "llama3.2-vision:11b"
+    assert captured_request["model"] == "qwen2.5vl:3b"
+    assert captured_request["format"] == "json"
     assert captured_request["messages"][1]["images"] == [make_request().image_base64]
+    assert '"in_interaction_range":false' in captured_request["messages"][1]["content"]
+    assert "performs approach, pickup" in captured_request["messages"][0]["content"]
+    assert '"allowed_actions"' in captured_request["messages"][1]["content"]
+    assert '"allowed_target_ids"' in captured_request["messages"][1]["content"]
     assert captured_request["options"]["temperature"] == 0
     assert proposal.action == "navigate_to"
     assert proposal.target_id == "object_01"
     assert inference_ms >= 0
+
+
+def test_allowed_actions_follow_held_object_state():
+    request = make_request()
+    assert allowed_actions(request) == ["navigate_to", "pick_up", "stop", "finish"]
+    assert action_target_ids(request)["pick_up"] == ["object_01"]
+
+    carrying_request = StepRequest.model_validate({
+        **request.model_dump(),
+        "visible_targets": [
+            {"target_id": "object_01", "category": "container", "in_interaction_range": False},
+            {"target_id": "delivery_01", "category": "platform", "in_interaction_range": False},
+        ],
+        "held_object_id": "object_01",
+    })
+    assert allowed_actions(carrying_request) == ["navigate_to", "place_on", "stop", "finish"]
+    assert action_target_ids(carrying_request)["navigate_to"] == ["delivery_01"]
+    assert action_target_ids(carrying_request)["place_on"] == ["delivery_01"]
+    assert "pick_up" not in allowed_actions(carrying_request)

@@ -56,6 +56,7 @@ ActionProposal: TypeAlias = Annotated[
 class TargetDescriptor(StrictModel):
     target_id: TargetId
     category: Literal["container", "platform"]
+    in_interaction_range: bool = False
 
 
 class ActionResult(StrictModel):
@@ -150,3 +151,9 @@ def validate_proposal_target(proposal: ActionProposal, request: StepRequest) -> 
         raise ValueError("pick_up requires a visible container target")
     if isinstance(proposal, PlaceOn) and target.category != "platform":
         raise ValueError("place_on requires a visible platform target")
+    if isinstance(proposal, PickUp):
+        if request.held_object_id is not None:
+            raise ValueError("pick_up is invalid while an object is held")
+    if isinstance(proposal, PlaceOn):
+        if request.held_object_id is None:
+            raise ValueError("place_on is invalid when no object is held")

@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 @dataclass(frozen=True)
 class Settings:
     ollama_url: str = "http://127.0.0.1:11434"
-    model_name: str = "llama3.2-vision:11b"
+    model_name: str = "qwen2.5vl:3b"
     inference_timeout_seconds: float = 120.0
 
     @classmethod

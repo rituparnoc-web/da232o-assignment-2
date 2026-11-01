@@ -63,8 +63,24 @@ def test_health_distinguishes_service_from_model_readiness():
     assert response.json() == {
         "status": "ok",
         "model_ready": False,
-        "model": "llama3.2-vision:11b",
+        "model": "qwen2.5vl:3b",
     }
+
+
+def test_cors_preflight_allows_local_browser_client():
+    response = send_request(
+        create_app(Settings(), FakeModel()),
+        "OPTIONS",
+        "/step",
+        headers={
+            "origin": "http://localhost:5173",
+            "access-control-request-method": "POST",
+            "access-control-request-headers": "content-type",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
 
 
 def test_step_returns_correlated_proposal_and_backend_generated_action_id():

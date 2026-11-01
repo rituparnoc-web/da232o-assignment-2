@@ -9,3 +9,6 @@ unity/Obj/
 unity/Build/
 unity/Builds/
 unity/Logs/
+web/node_modules/
+web/dist/
+web/tsconfig.tsbuildinfo

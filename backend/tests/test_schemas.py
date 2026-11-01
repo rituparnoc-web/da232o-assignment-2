@@ -26,7 +26,7 @@ def make_png() -> bytes:
     return buffer.getvalue()
 
 
-def make_request() -> StepRequest:
+def make_request(object_in_range: bool = True, platform_in_range: bool = True) -> StepRequest:
     return StepRequest(
         session_id=uuid4(),
         request_id=uuid4(),
@@ -35,8 +35,8 @@ def make_request() -> StepRequest:
         image_media_type="image/png",
         image_base64=b64encode(make_png()).decode("ascii"),
         visible_targets=[
-            {"target_id": "object_01", "category": "container"},
-            {"target_id": "delivery_01", "category": "platform"},
+            {"target_id": "object_01", "category": "container", "in_interaction_range": object_in_range},
+            {"target_id": "delivery_01", "category": "platform", "in_interaction_range": platform_in_range},
         ],
     )
 
@@ -89,7 +89,26 @@ def test_target_allowlist_accepts_matching_visible_targets():
     request = make_request()
 
     validate_proposal_target(PickUp(action="pick_up", target_id="object_01"), request)
-    validate_proposal_target(PlaceOn(action="place_on", target_id="delivery_01"), request)
+    carrying = request.model_copy(update={"held_object_id": "object_01"})
+    validate_proposal_target(PlaceOn(action="place_on", target_id="delivery_01"), carrying)
+
+
+def test_target_allowlist_accepts_high_level_pickup_outside_range():
+    request = make_request(object_in_range=False)
+
+    validate_proposal_target(PickUp(action="pick_up", target_id="object_01"), request)
+
+
+def test_target_allowlist_enforces_held_object_preconditions():
+    request = make_request()
+    carrying = request.model_copy(update={"held_object_id": "object_01"})
+    empty = request.model_copy(update={"held_object_id": None})
+
+    with pytest.raises(ValueError, match="while an object is held"):
+        validate_proposal_target(PickUp(action="pick_up", target_id="object_01"), carrying)
+
+    with pytest.raises(ValueError, match="when no object is held"):
+        validate_proposal_target(PlaceOn(action="place_on", target_id="delivery_01"), empty)
 
 
 def test_step_request_rejects_truncated_image_even_with_valid_png_header():

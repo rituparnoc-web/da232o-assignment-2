@@ -5,6 +5,7 @@ from uuid import uuid4
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.model_client import DecisionModel, ModelError, OllamaModelClient
 from app.schemas import StepRequest, StepResponse, validate_proposal_target
@@ -21,6 +22,12 @@ def create_app(settings: Settings | None = None, model_client: DecisionModel | N
         await decision_model.aclose()
 
     app = FastAPI(title="Habitat VLM Backend", lifespan=lifespan)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+        allow_methods=["GET", "POST"],
+        allow_headers=["content-type"],
+    )
 
     @app.exception_handler(RequestValidationError)
     async def request_validation_error(_: Request, __: RequestValidationError) -> JSONResponse:
