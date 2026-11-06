@@ -1,0 +1,14 @@
+# HabitatVLM - Python bridge dependencies
+# Install INSIDE the project venv (my_env):
+#   my_env\Scripts\python.exe -m pip install -r requirements.txt
+#
+# Pinned after a working install; see requirements.lock.txt for the full freeze.
+
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pydantic>=2.7
+openai>=1.40          # OpenAI-compatible client for Ollama / Gemini / Groq / OpenRouter
+python-dotenv>=1.0
+pyyaml>=6.0
+pillow>=10.3
+requests>=2.32        # used by tools/fake_unity.py (Unity stand-in for testing)
