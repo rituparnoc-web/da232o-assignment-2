@@ -1,0 +1,73 @@
+# HabitatVLM bridge configuration (committed - contains NO secrets).
+# Secrets and the Kaggle tunnel URL live in bridge/.env (never committed).
+#
+# Switch backend by changing ONLY `active_backend` (or set env var VLM_BACKEND).
+#   mock   - scripted commands, no model (pipe testing)
+#   local  - Ollama on this laptop
+#   kaggle - Ollama on a Kaggle GPU notebook via Cloudflare tunnel
+#   gemini - Google Gemini, OpenAI-compatible endpoint (free tier)
+#   groq   - Groq, OpenAI-compatible endpoint
+
+active_backend: kaggle
+
+backends:
+  mock:
+    type: mock
+    model: scripted-demo
+
+  local:
+    type: openai
+    base_url: "http://localhost:11434/v1"
+    model: "qwen3-vl:4b"
+    api_key_env: null
+    timeout_s: 60
+
+  kaggle:
+    type: openai
+    base_url_env: "KAGGLE_TUNNEL_URL"   # e.g. https://xxxx.trycloudflare.com  (/v1 is added automatically)
+    model: "qwen3-vl:8b"
+    api_key_env: null
+    timeout_s: 60                       # first call after a pull loads the model into GPU memory
+
+  gemini:
+    type: openai
+    base_url: "https://generativelanguage.googleapis.com/v1beta/openai/"
+    model: "gemini-2.5-flash"           # VERIFY against the current free-tier list in AI Studio
+    api_key_env: "GEMINI_API_KEY"
+    timeout_s: 30
+
+  groq:
+    type: openai
+    base_url: "https://api.groq.com/openai/v1"
+    model: "meta-llama/llama-4-scout-17b-16e-instruct"   # VERIFY against Groq's current vision models
+    api_key_env: "GROQ_API_KEY"
+    timeout_s: 30
+
+# Request settings
+temperature: 0.2
+max_tokens: 300
+json_mode: true          # ask the backend for JSON output when supported
+
+# Episode / validation
+image_size: 512          # incoming frames are resized to this (square) before sending
+jpeg_quality: 80
+max_steps: 15
+max_retries_invalid: 1   # re-asks after an invalid reply; then fall back to look_around
+history_len: 3           # last N actions included in the prompt
+
+# Logging
+log_dir: "logs"          # relative to bridge/
+save_frames: true        # logs/frames/<episode_id>/<step>.jpg
+
+# Object kinds used by the validator's type rules (SPEC 5.3 / 8.4).
+# Names MUST match the Unity Hierarchy exactly. Unity may also send kinds
+# itself in /episode/start (object_kinds); those override this table.
+object_kinds:
+  red_canister: item
+  blue_canister: item
+  green_canister: item
+  toolbox: item
+  shelf_a: surface
+  table: surface
+  cabinet_left: container
+  cabinet_right: container

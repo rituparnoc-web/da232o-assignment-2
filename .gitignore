@@ -1,0 +1,61 @@
+# HabitatVLM .gitignore (repo root = "Final Project - Unity (VLM)")
+
+# ---------- Unity (project lives in "Unity (VLM Project)/") ----------
+# Patterns without a leading slash match at any depth, so they cover the
+# Unity folder whatever it is called.
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+*.csproj
+*.sln
+*.slnx
+*.suo
+*.user
+*.pidb
+*.booproj
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+.vs/
+.vsconfig
+*.apk
+*.aab
+*.unitypackage
+crashlytics-build.properties
+
+# Keep Unity's .meta files (they hold asset GUIDs) - do NOT ignore *.meta
+
+# ---------- Python ----------
+my_env/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# ---------- Secrets and run output - NEVER commit ----------
+.env
+.env.*
+!.env.example
+logs/
+bridge/logs/
+
+# ---------- OS / editor ----------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+
+# ---------- Project-specific ----------
+Unity (VLM Project)/
+kaggle/
+HabitatBuilder.cs
+requirements.lock.txt
+VLM_Game_Engine_Project_Plan.pdf
