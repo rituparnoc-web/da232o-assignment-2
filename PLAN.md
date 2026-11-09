@@ -22,7 +22,6 @@ my_env\Scripts\python.exe -m pip install -r requirements.txt
 - [ ] Kaggle account → **phone-verify** it (needed to turn on Internet in notebooks).
 - [ ] Optional: Google AI Studio → Gemini API key (backup backend C).
 - [ ] `git init` → first commit (check `git status` shows no `Library/`, `my_env/` or `.env`).
-- [ ] Optional: Ollama for Windows (backend A, Phase 7).
 
 ---
 
@@ -53,7 +52,7 @@ To test without a model, first run `$env:VLM_BACKEND="mock"` (PowerShell) or `se
 
 ---
 
-## Phase 3 — Kaggle VLM backend (B) (Week 1–2, ~1 day)
+## Phase 3 — Kaggle VLM backend (B) ✅ (done 6 Nov)
 
 - [ ] kaggle.com → *Create* → *New Notebook* → *File → Import Notebook* → `kaggle/ollama_server.ipynb`.
 - [ ] Session options: **GPU T4 x2**, **Internet On** → *Run All*.
@@ -67,58 +66,48 @@ To test without a model, first run `$env:VLM_BACKEND="mock"` (PowerShell) or `se
 
 ---
 
-## Phase 4 — Unity image link: robot camera → bridge → Kaggle (Week 2, ~½ day)
+## Phase 4 — Unity image link: robot camera → bridge → Kaggle ✅ (done 9 Nov)
 
-Scripts are written (`Assets/Scripts/Bridge/`). In the Unity editor:
-- [ ] Open `Assets/Habitat.unity`. Wait for scripts to compile (Console must be free of errors).
-- [ ] Select `robot_cam` → *Add Component* → **Camera Capture**. Check *Target Texture* = `RobotCamRT`.
-- [ ] *GameObject → Create Empty* → name it `AgentManager` → *Add Component* **Bridge Client** and **Bridge Image Test**.
-- [ ] Bridge running (Kaggle backend) → press **Play** → press **SPACE**.
-- [ ] The Game view shows the robot's camera view (top left) and the model's reply below it.
-- [ ] Check `bridge/logs/frames/<episode>/000.jpg` looks the same as the robot view (colours not too dark/washed out).
-- [ ] Commit.
+- [x] `CameraCapture` on `robot_cam`; `AgentManager` with `BridgeClient` + `BridgeImageTest`.
+- [x] Play → SPACE: real robot-camera frame (9 KB JPEG) reached `qwen3-vl:8b-instruct` on Kaggle; reply `move_to(red_canister)`, valid, ~4.4 s. Saved frame matches the robot view.
 
-If the request is refused with an "insecure connection" error: *Project Settings → Player → Other Settings → Allow downloads over HTTP* → **Always allowed** (or *Development builds only*).
-
-**Checkpoint 4:** Pressing SPACE in Play mode sends the real robot-camera frame to the VLM on Kaggle and shows a valid command and "thought" on screen.
+**Checkpoint 4:** ✅ passed. (The robot does not move yet; that is Phase 5/6.)
 
 ---
 
-## Phase 5 — Robot and skills, keyboard only (Week 2–3, ~4–5 days)
+## Phase 5 — Robot and skills, keyboard only ✅ (done 9 Nov)
 
-- [ ] Write `Interactable.cs`; add it to every item, surface and cabinet; set `kind` and `snapPoint` (the `snap_point` children already exist).
-- [ ] Write `Cabinet.cs` with `Open()` and `Close()`, rotating `hinge` over about 1 s.
-- [ ] Write `RobotSkills.cs` with `MoveTo`, `Pick`, `Place`, `Open`, `Close` and `LookAround`, each returning `SkillResult { success, reason }`.
-  - [ ] `Pick` = check reach (≤ 1 m) and that the gripper is empty → parent the item to `gripper` and disable its physics.
-  - [ ] `Place` = move the item to the location's `snapPoint` and un-parent it.
-- [ ] Write `KeyboardDebug.cs` (Input System `Keyboard.current`): 1 = move to shelf, 2 = pick red, 3 = move to cabinet_left, 4 = open, 5 = place, 6 = close.
-- [ ] Commit.
+- [x] `Interactable`, `Cabinet`, `RobotSkills`, `KeyboardDebug` + menu **HabitatVLM → Setup Interactables and Robot**.
+- [x] Keyboard run 1→6 put the red canister in the left cabinet; out-of-reach and empty-gripper failures reported clearly.
+- [x] Fix: the robot now stands at the middle of a furniture's open long side / in front of the item (was the nearest corner → "out of reach 1.2 m").
 
-**Checkpoint 5:** Using only the keyboard, the robot completes "put the red canister in the left cabinet". Failure cases (out of reach, cabinet closed) log a clear reason in the Console.
+**Checkpoint 5:** ✅ passed.
 
 ---
 
-## Phase 6 — Full agent loop with the VLM (Week 3, ~3–4 days)
+## Phase 6 — Full agent loop with the VLM (Qwen drives the robot) ✅ (done 9 Nov)
 
-- [ ] `AgentLoop.cs`: start episode → loop { capture → `/step` → execute skill → record `SkillResult` as `last_result` } until `done` or `max_steps` → success check → `/episode/end`.
-- [ ] Build `robot_state` from the scene (holding, objects within ~1.5 m as `near`, cabinet states).
-- [ ] First run with `VLM_BACKEND=mock`: the scripted sequence must complete the task (this tests the skills + loop without the model).
-- [ ] Then with Kaggle: "Open the left cabinet", "Put the red canister in the left cabinet". Read the `thought` column in `steps.csv` to see why the model chose each action.
-- [ ] Tune `prompts.py` if the model repeats failing actions (it gets the last result and last 3 actions).
-- [ ] Commit.
+- [x] `AgentLoop.cs` panel (task presets, Start/Stop/Reset) + `TaskSpec.cs` success checks + `Assets/Tasks/tasks_room01.json` (8 tasks). Object list read from the scene.
+- [x] Mock run: T04 completed by the scripted sequence → SUCCESS (skills + loop verified without the model).
+- [x] Kaggle, prompt v1: T01/T02 succeeded with wasted steps; T03 looped (pick/place), T04 took 13 steps → model did not know when to stop.
+- [x] Prompt v2 (full history, item locations from Unity, "is the task complete?" check, never undo progress, repetition warning).
+- [x] Kaggle, prompt v2: T03 in 3 steps, T04 in 6 steps (×2), 0 invalid replies, ~5 s/step.
+- [x] Loop stops cleanly after 2 model-backend failures instead of spinning.
 
-**Checkpoint 6:** "Open the left cabinet" and "Put the red canister in the left cabinet" succeed end-to-end on Kaggle with no keyboard input.
+**Checkpoint 6:** ✅ passed: tasks succeed end-to-end on Kaggle with no keyboard input.
 
 ---
 
-## Phase 7 — Other backends and robustness (Week 4, ~2–3 days)
+## Phase 7 — Second backend (Gemini) and robustness
 
-- [ ] **Backend C (Gemini):** put `GEMINI_API_KEY` in `.env`, check the current free-tier Flash model ID in AI Studio → update `config.yaml` → rerun the Easy tasks.
-- [ ] **Backend A (local):** close heavy apps → `ollama pull qwen3-vl:4b` → `active_backend: local` → one Easy task, note the latency.
-- [ ] Robustness: deliberately bad replies (already unit-tested in the bridge) → confirm Unity handles `look_around` fallbacks and `meta.valid=false`.
+Scope (9 Nov): Kaggle (B) + Gemini (C) only; no local model, no Groq.
+- [x] `GEMINI_API_KEY` in `bridge/.env`; key verified (HTTP 200); `gemini-2.5-flash` available (newer Flash models also listed).
+- [ ] Start bridge with `$env:VLM_BACKEND="gemini"` (or set `active_backend: gemini`) → run T01, T03, T04 → compare with Kaggle.
+- [ ] Optionally try a newer Flash model (e.g. `gemini-3.5-flash`) if 2.5 struggles; watch the free-tier daily limit.
+- [ ] Robustness: confirm Unity handles `look_around` fallbacks / `meta.valid=false` (bridge side already tested).
 - [ ] Commit.
 
-**Checkpoint 7:** The same Easy task succeeds on B, C and A by changing only `active_backend`. Invalid replies are logged, not fatal.
+**Checkpoint 7:** The same tasks succeed on Kaggle and Gemini by changing only the backend setting.
 
 ---
 
@@ -127,7 +116,6 @@ If the request is refused with an "insecure connection" error: *Project Settings
 - [ ] Write `tasks.json` with 24 tasks (8 Easy, 8 Medium, 8 Hard) and their success conditions (SPEC §11).
 - [ ] `TaskRunner.cs`: reset the scene → run each task → move to the next.
 - [ ] Run the full suite on **B** (Kaggle, primary) and on **C** (watch the daily rate limit; split across days if needed).
-- [ ] Run Easy + Medium only on **A**, since local is slow.
 - [ ] `eval/analyze.py`: results table (success % by tier and backend, mean latency, invalid %) and one or two charts.
 - [ ] Review the failures: categorise them (wrong object, wrong order, navigation, invalid JSON) and note 3 lessons.
 - [ ] Record a 2–3 minute demo video (OBS Studio): split view of the robot camera, the scene, and the bridge log.
@@ -138,7 +126,24 @@ If the request is refused with an "insecure connection" error: *Project Settings
 
 ---
 
-## Phase 9 — Stretch goals (optional, pick any)
+## Phase 9 — Any room: generalisation + 5 new test rooms (added 9 Nov)
+
+Goal (SPEC §5.6, option A): the same code works in any room built from the supported object types; only the scene changes.
+- [ ] Room layout files `rooms/room_XX.json` (room size, objects: name, kind, primitive, position, rotation, size, colour, door direction) + a general **HabitatVLM → Build Room from Layout** editor tool. Rebuild the current room as `room_01` and confirm nothing changed.
+- [ ] Objects describe themselves: `HabitatSetup` scans the scene for `Interactable`s instead of a fixed name list; remove `object_kinds` from `bridge/config.yaml` (Unity sends kinds).
+- [ ] NavMesh rebuilt automatically at Play (`NavMeshSurface.BuildNavMesh`), so moved furniture needs no manual bake.
+- [ ] Skills handle rotated furniture (object's own axes) and free-standing cabinets (door direction from the container).
+- [ ] Generic keyboard debug (pick any object from a list) instead of fixed keys.
+- [ ] Build **5 new rooms** (`room_02` … `room_06`, space-habitat themes: storage bay, lab, galley, crew cabin, airlock), each with its own scene and `Assets/Tasks/tasks_room0X.json`.
+- [ ] Keyboard check in each new room, then the agent on 2–3 tasks per room (Kaggle).
+- [ ] Add per-room success rates to the results table (`eval/analyze.py`).
+
+**Checkpoint 9:** The unchanged code completes tasks in at least 4 of the 6 rooms; results reported per room.
+
+---
+
+## Phase 10 — Stretch goals (optional, pick any)
+
 
 - [ ] Remove the object-name list from the prompt (the VLM must recognise objects from the image alone); measure the drop in success.
 - [ ] Voice task input (speech-to-text → task).
@@ -155,10 +160,11 @@ If the request is refused with an "insecure connection" error: *Project Settings
 | Week | Phases | Demo at end of week |
 |---|---|---|
 | 1 | 0, 1, 2 | Habitat room; bridge answering scripted commands ✅ |
-| 2 | 3, 4 | Robot camera frame from Unity answered by the VLM on Kaggle |
-| 3 | 5, 6 | Robot completes a task by keyboard, then driven by the VLM |
-| 4 | 7 | Same task on Kaggle, Gemini and local; robust to bad output |
+| 2 | 3, 4 ✅ | Robot camera frame from Unity answered by the VLM on Kaggle ✅ |
+| 3 | 5 ✅, 6 ✅ | Robot completes a task by keyboard, then driven by the VLM ✅ |
+| 4 | 7 | Same tasks on Kaggle and Gemini; robust to bad output |
 | 5 | 8 | Results table, demo video, README; v1.0 |
+| 6 | 9 | Same code in 5 new rooms; per-room results |
 
 ---
 
@@ -181,7 +187,6 @@ If the request is refused with an "insecure connection" error: *Project Settings
 | Tunnel URL changes / tunnel drops mid-run | High | Low | Bridge retries 52x errors; monitor cell flags a dead tunnel; re-run step 5 and update `.env` |
 | Tunnel is public while running | Medium | Low | Short sessions, URL never committed; stretch goal: token proxy |
 | Free API daily limit reached (Gemini) | High | Medium | Kaggle is the primary backend; split runs across days |
-| Local model too slow | High | Low | Use local only for a small subset; report its latency honestly |
 | VLM confuses left/right cabinets | Medium | Medium | Distinct door colours (purple/orange); container states in the prompt |
 | Laptop runs out of RAM | Medium | High | Session checklist step 1; never run local model + Unity + browsers together |
 | Kaggle quota or policy changes | Low | Medium | Gemini (C) as fallback; Colab as a second GPU option |

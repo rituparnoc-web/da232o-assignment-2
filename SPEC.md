@@ -3,7 +3,7 @@
 **Project codename:** HabitatVLM
 **Owner:** Supratim
 **Version:** 0.2 (6 Nov 2026)
-**Status:** Scene, bridge, Kaggle backend and Unity image link implemented; robot skills next
+**Status:** Phases 0–5 verified (9 Nov): bridge, Kaggle backend, image link, robot skills. Phase 6 (agent loop) in progress; Phase 9 (any room + 5 new rooms) planned
 
 **Changes in 0.2**
 - Build order changed: **bridge → Kaggle backend → Unity image link → robot skills** (see PLAN).
@@ -35,8 +35,8 @@ A robot inside a small 3D space-habitat module (built in Unity) receives a task 
 - G1. End-to-end loop: camera image → VLM → validated command → robot action, fully automatic.
 - G2. Swappable model backends, switched only through config (`active_backend`):
   - **B** Ollama on a Kaggle GPU notebook, reached through a Cloudflare tunnel. **Primary for development.**
-  - **C** Hosted vision API (Gemini free tier; Groq/OpenRouter as alternatives). Backup and comparison.
-  - **A** Local Ollama on the laptop (small model, offline). Comparison only.
+  - **C** Gemini (free tier, OpenAI-compatible endpoint). Second backend for the comparison. Key verified 9 Nov.
+  - *Out of scope (decided 9 Nov):* **A** local Ollama and Groq/OpenRouter. The code still supports them (config only), but they are not run or reported.
   - `mock`: scripted replies, no model. Used to test the pipe.
 - G3. Reliable on a low-spec laptop (16 GB RAM, integrated AMD GPU).
 - G4. Measurable results: success rate, latency and invalid-output rate per backend.
@@ -84,7 +84,7 @@ A robot inside a small 3D space-habitat module (built in Unity) receives a task 
               ▼                                        ▼                        ▼
    B) Ollama on Kaggle GPU (primary)       C) Cloud vision API          A) Local Ollama
    https://<x>.trycloudflare.com/v1        Gemini / Groq / OpenRouter   localhost:11434/v1
-   qwen3-vl:8b on T4                       (API key)                    qwen3-vl:4b
+   qwen3-vl:8b-instruct on T4              (API key)                    qwen3-vl:4b-instruct
 ```
 
 ### 4.1 Responsibilities
@@ -137,7 +137,15 @@ Built automatically by the editor menu **HabitatVLM → Build Habitat Room** (`A
 - Base: capsule with `NavMeshAgent` (speed 1.5 m/s, stopping distance 0.6 m).
 - Gripper: empty Transform `gripper` at the front, about 1 m high.
 - Camera: `robot_cam`, forward-facing, FOV 70°, renders to `Assets/Textures/RobotCamRT` (512×512).
-- Reach: an item is pickable if it is within **1.0 m** of `gripper`.
+- Reach: pick/place/open/close need the target within **1.0 m horizontally** of `gripper` (height is ignored, so shelf tops and cabinet floors are both reachable).
+- Navigation: `move_to` drives to the NavMesh point nearest the object (cabinets: straight in front of the door, so the swinging door misses the robot), then turns to face it. Agent stopping distance is 0.05 m because the stand-point is computed by the skill.
+- `near` (sent to the bridge) = objects within 1.3 m horizontally of the robot.
+
+### 5.6 Design rule: any room (decided 9 Nov, option A)
+- **The Unity scene is the single source of truth.** Every interactable object describes itself with an `Interactable` component (kind, snap point; containers also their door). At Play, Unity discovers the objects in the loaded room and sends their names and kinds to the bridge in `/episode/start`.
+- No script may name a specific object or position. Exceptions, clearly marked as test/demo tools: `HabitatBuilder` (builds room 01), the bridge `mock` script, `KeyboardDebug` presets, and per-room task files.
+- Supported object types: **item**, **surface**, **container** (hinged door), plus static **obstacles**. New interaction types (drawers, buttons…) need a new skill. That is by design: the VLM decides *what*, Unity decides *how*.
+- Generalisation is shown by testing the unchanged code in 5 additional rooms (PLAN Phase 9). Removing object names from the prompt (pure image grounding, "option B") stays a stretch goal.
 
 ---
 
@@ -169,7 +177,7 @@ Transport: HTTP/JSON on `http://127.0.0.1:8000`. Use `127.0.0.1`, not `localhost
 - The bridge also accepts the plain-JSON forms (`null`, `{"cabinet_left": "closed"}`).
 
 ### 7.1 `GET /health`
-Response `200`: `{ "status": "ok", "backend": "kaggle", "model": "qwen3-vl:8b" }`
+Response `200`: `{ "status": "ok", "backend": "kaggle", "model": "qwen3-vl:8b-instruct" }`
 
 ### 7.2 `POST /episode/start`
 ```json
@@ -195,7 +203,8 @@ Request:
   "robot_state": {
     "holding": "",
     "near": ["shelf_a", "red_canister"],
-    "containers": [{"name": "cabinet_left", "state": "closed"}, {"name": "cabinet_right", "state": "closed"}]
+    "containers": [{"name": "cabinet_left", "state": "closed"}, {"name": "cabinet_right", "state": "closed"}],
+    "items": [{"name": "red_canister", "state": "on shelf_a"}, {"name": "blue_canister", "state": "held by robot"}]
   },
   "last_result": { "action": "move_to", "target": "shelf_a", "object": "", "location": "", "success": true, "reason": "" }
 }
@@ -252,9 +261,10 @@ def ask(self, image_jpeg: bytes, system_prompt: str, user_prompt: str, *, step: 
 `bridge/.env` (**never committed**; template `bridge/.env.example`): `GEMINI_API_KEY`, `GROQ_API_KEY`, `KAGGLE_TUNNEL_URL`.
 Model IDs must be checked against each provider's current model list before use.
 
-### 8.3 Prompt template
-The system prompt is fixed (see `prompts.py`). It lists the 7 actions, which fields each action uses, the reach/open-container rules, the JSON reply schema and a "thought" under 25 words.
-The per-step user prompt contains: the task, the step number out of max, the valid object names grouped by kind, the robot state (holding, near, container states), the last action and its result, the last 3 actions, and (on a re-ask) the validation error.
+### 8.3 Prompt template (v2, 9 Nov)
+The system prompt is fixed (see `prompts.py`). It lists the 7 actions and their fields, a decision procedure (**first check whether the task is already complete → `done`**, otherwise one action that makes progress), and rules: use only listed names, do exactly the task and nothing more, **never undo progress**, move_to before acting, open containers first, fix the cause of a failed action. Reply schema JSON, "thought" < 25 words.
+The per-step user prompt contains: the task, valid object names grouped by kind, robot state (holding, near, container states), **item locations** (`on X` / `in X` / `held by robot`, sent by Unity), **all actions of this episode with their results**, the last result with its reason, an optional **repetition warning** (same action twice, or an A-B-A-B pattern), and the validation error on a re-ask.
+*Why v2:* with v1 (last 3 actions, "STEP n of 15", no item locations) Qwen completed tasks but did not stop: it put items back, invented new goals and looped pick/place (T03 never finished, T04 took 13 steps). Replaying those exact frames with v2 gave `done` in 6/6 cases and correct progress actions in 4/4 mid-task cases.
 
 ### 8.4 Validation rules
 1. Reply parses as JSON. `<think>` blocks, code fences and text around the JSON are stripped; a JSON list → its first element.
@@ -283,8 +293,8 @@ Frames: `logs/frames/<episode_id>/<step>.jpg` (exactly what the model saw).
 | Item | Value |
 |---|---|
 | Accelerator | GPU T4 ×2 (or P100), Internet **On** |
-| Server | Ollama (official install script; needs `zstd`), `OLLAMA_HOST=0.0.0.0:11434`, `OLLAMA_KEEP_ALIVE=-1` |
-| Model | `qwen3-vl:8b` (fallback `qwen3-vl:4b`) |
+| Server | Ollama (official install script; needs `zstd`), `OLLAMA_HOST=0.0.0.0:11434`, `OLLAMA_KEEP_ALIVE=-1`, `OLLAMA_CONTEXT_LENGTH=8192` |
+| Model | `qwen3-vl:8b-instruct` (fallback `qwen3-vl:4b-instruct`). Use the **instruct** tags: plain `qwen3-vl:8b` always "thinks" first (7–9 s per step vs 4–5 s) |
 | Tunnel | `cloudflared tunnel --url http://127.0.0.1:11434 --http-host-header localhost:11434` (quick tunnel, no account) |
 | Endpoint used by the bridge | `https://<random>.trycloudflare.com/v1` (OpenAI-compatible) |
 | Notebook cells | install → start server → pull model → local image test (warm-up) → tunnel + print URL → tunnel check → request monitor |
@@ -296,16 +306,18 @@ Frames: `logs/frames/<episode_id>/<step>.jpg` (exactly what the model saw).
 
 | Script | Folder | Attached to | Responsibility | Status |
 |---|---|---|---|---|
-| `HabitatBuilder.cs` | `Scripts/Editor` | — (menu) | Builds room, materials, robot, camera | Done |
+| `HabitatBuilder.cs` | `Scripts/Editor` | — (menu) | Builds room, materials, robot, camera (then runs HabitatSetup) | Done |
+| `HabitatSetup.cs` | `Scripts/Editor` | — (menu) | **HabitatVLM → Setup Interactables and Robot**: adds the components below with kinds/snap points/hinges | Done |
 | `BridgeDtos.cs` | `Scripts/Bridge` | — | Serializable request/response classes (§7) | Done |
 | `BridgeClient.cs` | `Scripts/Bridge` | `AgentManager` | HTTP calls: health, start, step, end | Done |
 | `CameraCapture.cs` | `Scripts/Bridge` | `robot_cam` | RenderTexture → JPEG bytes | Done |
 | `BridgeImageTest.cs` | `Scripts/Bridge` | `AgentManager` | Image-link checkpoint: SPACE sends one frame, shows the reply | Done |
-| `Interactable.cs` | `Scripts/Robot` | Every interactable | Kind, snap point, open state | To do |
-| `Cabinet.cs` | `Scripts/Robot` | Each cabinet | Open/close by rotating the hinge (coroutine, about 1 s) | To do |
-| `RobotSkills.cs` | `Scripts/Robot` | Robot | `MoveTo`, `Pick`, `Place`, `Open`, `Close`, `LookAround` → `SkillResult` | To do |
-| `KeyboardDebug.cs` | `Scripts/Robot` | Robot (dev only) | Manual testing of skills via keys | To do |
-| `AgentLoop.cs` | `Scripts/Agent` | `AgentManager` | Episode loop: capture → step → execute → repeat; step limit; success check | To do |
+| `Interactable.cs` | `Scripts/Robot` | Every interactable | Kind, snap point, open state, current location of items, name registry | Written |
+| `Cabinet.cs` | `Scripts/Robot` | Each cabinet | Open/close by rotating the hinge (coroutine, about 1 s) | Written |
+| `RobotSkills.cs` | `Scripts/Robot` | Robot | `MoveTo`, `Pick`, `Place`, `Open`, `Close`, `LookAround` → `SkillResult`; `Execute(action,…)`; `GetState()` → robot_state | Written |
+| `KeyboardDebug.cs` | `Scripts/Robot` | Robot (dev only) | Keys 1–0 run skills, R resets the scene, on-screen state/log | Written |
+| `AgentLoop.cs` | `Scripts/Agent` | `AgentManager` | Episode loop: capture → step → execute → repeat; step limit; success check; on-screen panel (task presets, Start/Stop/Reset) | Written |
+| `TaskSpec.cs` | `Scripts/Agent` | — | Task file format + `SuccessChecker` (`item_in`, `item_on`, `container_state`, `holding`, `all`) | Written |
 | `TaskRunner.cs` | `Scripts/Agent` | `AgentManager` | Loads `tasks.json`, runs episodes in sequence for evaluation | To do |
 
 All network callbacks run inside coroutines on Unity's main thread. Keyboard input uses the Input System (`Keyboard.current`). The project's Active Input Handling is set to *Both*.
@@ -314,7 +326,7 @@ All network callbacks run inside coroutines on Unity's main thread. Keyboard inp
 
 ## 11. Task suite and success conditions
 
-Tasks are defined in `tasks.json`, shared by Unity and Python:
+Tasks are defined per room in `Assets/Tasks/tasks_roomXX.json` (`{ "room": ..., "tasks": [...] }`; room 01 has 8 tasks). Condition types: `item_in`, `item_on`, `container_state`, `holding`, `all`. A free-form task typed in the panel has no condition and is logged as *unverified*. Example:
 ```json
 [
   { "id": "T01", "task": "Open the left cabinet", "success": { "type": "container_state", "target": "cabinet_left", "state": "open" } },
@@ -346,7 +358,7 @@ Unity, not the VLM, decides success at `done` or when the step limit is reached.
 ## 13. Acceptance criteria (MVP)
 
 - [ ] AC1. Robot completes all **Easy** tasks with backend B (Kaggle) at ≥ 80% success.
-- [ ] AC2. At least one **Medium** task succeeds end-to-end on each of B, C and A.
+- [ ] AC2. At least one **Medium** task succeeds end-to-end on each of B (Kaggle) and C (Gemini).
 - [ ] AC3. Invalid VLM output never crashes Unity or the bridge. *(bridge side verified with malformed replies and a dead backend)*
 - [ ] AC4. `steps.csv` and `episodes.csv` are produced for every run.
 - [ ] AC5. A results table compares the backends: success %, mean latency, invalid-output %.
@@ -371,8 +383,9 @@ Final Project - Unity (VLM)/          # repo root
 │       ├── Habitat.unity             # main scene
 │       ├── Scripts/Editor/HabitatBuilder.cs
 │       ├── Scripts/Bridge/           # BridgeDtos, BridgeClient, CameraCapture, BridgeImageTest
-│       ├── Scripts/Robot/            # (to do) Interactable, Cabinet, RobotSkills, KeyboardDebug
-│       ├── Scripts/Agent/            # (to do) AgentLoop, TaskRunner
+│       ├── Scripts/Robot/            # Interactable, Cabinet, RobotSkills, KeyboardDebug
+│       ├── Scripts/Agent/            # AgentLoop, TaskSpec; (to do) TaskRunner
+│       ├── Tasks/tasks_room01.json   # task presets + success conditions (one file per room)
 │       ├── Materials/  Textures/RobotCamRT.renderTexture
 ├── bridge/
 │   ├── main.py  settings.py  vlm.py  prompts.py  validator.py  logger.py

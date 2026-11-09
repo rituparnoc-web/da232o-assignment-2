@@ -55,7 +55,8 @@ desktop.ini
 
 # ---------- Project-specific ----------
 Unity (VLM Project)/
-kaggle/
+# kaggle/
 HabitatBuilder.cs
 requirements.lock.txt
 VLM_Game_Engine_Project_Plan.pdf
+conversation_history/
