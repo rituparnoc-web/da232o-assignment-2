@@ -34,7 +34,7 @@ class Settings:
     jpeg_quality: int = 80
     max_steps: int = 15
     max_retries_invalid: int = 1
-    history_len: int = 3
+    history_len: int = 20
     log_dir: Path = field(default_factory=lambda: BRIDGE_DIR / "logs")
     save_frames: bool = True
     object_kinds: dict[str, str] = field(default_factory=dict)
@@ -97,7 +97,7 @@ def load_settings(backend_override: str | None = None) -> Settings:
         jpeg_quality=int(cfg.get("jpeg_quality", 80)),
         max_steps=int(cfg.get("max_steps", 15)),
         max_retries_invalid=int(cfg.get("max_retries_invalid", 1)),
-        history_len=int(cfg.get("history_len", 3)),
+        history_len=int(cfg.get("history_len", 20)),
         log_dir=log_dir,
         save_frames=bool(cfg.get("save_frames", True)),
         object_kinds={k.lower(): v.lower() for k, v in (cfg.get("object_kinds") or {}).items()},

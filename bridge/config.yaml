@@ -53,7 +53,7 @@ image_size: 512          # incoming frames are resized to this (square) before s
 jpeg_quality: 80
 max_steps: 15
 max_retries_invalid: 1   # re-asks after an invalid reply; then fall back to look_around
-history_len: 3           # last N actions included in the prompt
+history_len: 20          # actions of this episode shown to the model (all of them for max_steps 15)
 
 # Logging
 log_dir: "logs"          # relative to bridge/

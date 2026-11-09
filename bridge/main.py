@@ -19,7 +19,7 @@ from PIL import Image
 from pydantic import BaseModel, Field, field_validator
 
 from logger import RunLogger
-from prompts import SYSTEM_PROMPT, build_user_prompt
+from prompts import SYSTEM_PROMPT, build_user_prompt, repetition_warning
 from settings import load_settings
 from validator import Command, ValidationError, validate
 from vlm import VLMClient, VLMError
@@ -68,13 +68,15 @@ class RobotState(BaseModel):
     holding: Optional[str] = None
     near: list[str] = Field(default_factory=list)
     containers: Union[dict[str, str], list[dict[str, str]], None] = None
+    # item -> where it is ("on shelf_a", "in cabinet_left", "held by robot"); sent by Unity
+    items: Union[dict[str, str], list[dict[str, str]], None] = None
 
     @field_validator("holding", mode="before")
     @classmethod
     def _holding(cls, v):
         return _none_if_empty(v)
 
-    @field_validator("containers", mode="before")
+    @field_validator("containers", "items", mode="before")
     @classmethod
     def _containers(cls, v):
         return _pairs_to_dict(v, "state")
@@ -139,7 +141,9 @@ def _flush_pending(ep: Episode, result: Optional[LastResult]) -> None:
     if ep.pending_row is None:
         return
     row = ep.pending_row
-    if result is not None and result.action:
+    # Only attach Unity's outcome if it belongs to this row's action
+    # (e.g. a final "done" is never executed, so it must not inherit the previous result)
+    if result is not None and result.action and result.action == row.get("action"):
         row["unity_success"] = result.success
         row["unity_reason"] = result.reason
     runlog.step(row)
@@ -188,7 +192,8 @@ def step(req: StepReq):
     if req.last_result and req.last_result.action:
         r = req.last_result
         args = ",".join(x for x in (r.target, r.object, r.location) if x)
-        ep.history.append(f"{r.action}({args})->{'ok' if r.success else 'fail'}")
+        outcome = "SUCCESS" if r.success else f"FAILED ({r.reason})" if r.reason else "FAILED"
+        ep.history.append(f"{r.action}({args}) -> {outcome}")
 
     jpeg = _prepare_image(req.image_b64)
     runlog.frame(ep.id, req.step, jpeg)
@@ -196,6 +201,7 @@ def step(req: StepReq):
     state = req.robot_state.model_dump()
     last = req.last_result.model_dump() if req.last_result else None
     history = ep.history[-settings.history_len :]
+    warning = repetition_warning(history)
 
     error: Optional[str] = None
     cmd: Optional[Command] = None
@@ -204,7 +210,7 @@ def step(req: StepReq):
     for attempt in range(settings.max_retries_invalid + 1):
         retries = attempt
         prompt = build_user_prompt(ep.task, ep.object_kinds, state, last, history,
-                                   req.step, ep.max_steps, error)
+                                   req.step, ep.max_steps, error, warning)
         t0 = time.perf_counter()
         try:
             raw = vlm.ask(jpeg, SYSTEM_PROMPT, prompt, step=req.step)
