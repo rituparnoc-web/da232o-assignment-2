@@ -18,14 +18,14 @@ backends:
   local:
     type: openai
     base_url: "http://localhost:11434/v1"
-    model: "qwen3-vl:4b"
+    model: "qwen3-vl:4b-instruct"
     api_key_env: null
     timeout_s: 60
 
   kaggle:
     type: openai
     base_url_env: "KAGGLE_TUNNEL_URL"   # e.g. https://xxxx.trycloudflare.com  (/v1 is added automatically)
-    model: "qwen3-vl:8b"
+    model: "qwen3-vl:8b-instruct"       # instruct = no hidden "thinking": ~4-5 s/step vs 7-9 s for qwen3-vl:8b
     api_key_env: null
     timeout_s: 60                       # first call after a pull loads the model into GPU memory
 
