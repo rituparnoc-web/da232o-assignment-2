@@ -9,6 +9,8 @@ export interface ExecutionResult {
   message: string;
 }
 
+export type TableSide = "north" | "south" | "east" | "west";
+
 interface HabitatTarget {
   id: string;
   label: string;
@@ -456,7 +458,7 @@ export class HabitatWorld {
     }
   }
 
-  async executePickAndPlace(targetId: string, onPhase: (phase: string) => void): Promise<ExecutionResult> {
+  async executePickAndPlace(targetId: string, onPhase: (phase: string) => void, tableSide?: TableSide): Promise<ExecutionResult> {
     const target = this.targets.get(targetId);
     if (!target || target.category !== "container" || target.status === "delivered") {
       return { status: "failed", target_id: targetId, error_code: "unknown_target", message: "Selected container is not available." };
@@ -476,12 +478,35 @@ export class HabitatWorld {
       if (pickup.status !== "succeeded") return pickup;
     }
 
+    if (tableSide) {
+      onPhase(`Going around the ${tableSide} side of the table`);
+      const route = await this.goAroundTable(tableSide);
+      if (route.status !== "succeeded") return route;
+    }
+
     onPhase("Approaching delivery platform");
     const deliveryApproach = await this.navigateTo("delivery_01");
     if (deliveryApproach.status !== "succeeded") return deliveryApproach;
 
     onPhase("Placing container on delivery platform");
     return this.placeOn("delivery_01");
+  }
+
+  async goAroundTable(side: TableSide): Promise<ExecutionResult> {
+    let waypoints: THREE.Vector3[];
+    if (side === "north" || side === "south") {
+      const z = side === "north" ? -1.8 : 3.3;
+      waypoints = [new THREE.Vector3(-2.3, 0, z), new THREE.Vector3(2.3, 0, z)];
+    } else {
+      const x = side === "west" ? -2.3 : 4.3;
+      waypoints = [new THREE.Vector3(x, 0, -1.8), new THREE.Vector3(x, 0, 3.3)];
+      if (this.robot.position.z > 0.75) waypoints.reverse();
+    }
+    for (const waypoint of waypoints) {
+      const result = await this.walkPath(waypoint);
+      if (result.status !== "succeeded") return result;
+    }
+    return { status: "succeeded", message: `Rover passed the ${side} side of the table.` };
   }
 
   private async navigateTo(id: string): Promise<ExecutionResult> {

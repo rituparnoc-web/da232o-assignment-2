@@ -1,5 +1,5 @@
 import { checkApi, requestAction, type ActionResult, type StepResponse } from "./api";
-import { HabitatWorld, type ExecutionResult } from "./world";
+import { HabitatWorld, type ExecutionResult, type TableSide } from "./world";
 import "./style.css";
 
 const byId = <T extends HTMLElement>(id: string): T => {
@@ -145,6 +145,9 @@ async function doManualAction(action: { action: "navigate_to" | "pick_up" | "pla
 async function runMission(): Promise<void> {
   const taskText = instruction.value.trim();
   if (!taskText || running) return;
+  const requestedSide = taskText.match(/\b(north|south|east|west)\s+side\s+of\s+(?:the\s+)?table\b/i)?.[1]?.toLowerCase();
+  const tableSide = requestedSide as TableSide | undefined;
+  let tableRouteCompleted = false;
   running = true;
   currentStep = 0;
   previousActionResult = null;
@@ -230,7 +233,7 @@ async function runMission(): Promise<void> {
         const result = await world.executePickAndPlace(targetId, (phase) => {
           setSceneStatus(phase, true);
           logEvent(phase, "is-model");
-        });
+        }, tableSide);
         previousActionResult = toActionResult(decision.action_id, result);
         syncWorldReadout();
         logEvent(result.message, result.status === "failed" ? "is-error" : "is-success");
@@ -242,6 +245,22 @@ async function runMission(): Promise<void> {
         if (result.status !== "succeeded") break;
         logEvent(`Wrong object delivered; expected ${expectedTargetId}.`, "is-error");
         break;
+      }
+
+      if (tableSide && !tableRouteCompleted && world.getHeldObjectId()
+          && (decision.proposal.action === "place_on"
+            || (decision.proposal.action === "navigate_to" && decision.proposal.target_id === "delivery_01"))) {
+        setSceneStatus(`table / ${tableSide}`, true);
+        const route = await world.goAroundTable(tableSide);
+        logEvent(route.message, route.status === "succeeded" ? "is-success" : "is-error");
+        if (route.status !== "succeeded") break;
+        tableRouteCompleted = true;
+        if (decision.proposal.action === "place_on") {
+          setSceneStatus("approaching delivery platform", true);
+          const approach = await world.execute({ action: "navigate_to", target_id: decision.proposal.target_id });
+          logEvent(approach.message, approach.status === "succeeded" ? "is-success" : "is-error");
+          if (approach.status !== "succeeded") break;
+        }
       }
 
       setSceneStatus(decision.proposal.action, true);
