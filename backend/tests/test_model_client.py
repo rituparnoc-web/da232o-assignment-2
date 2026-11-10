@@ -7,7 +7,7 @@ from uuid import uuid4
 import httpx
 from PIL import Image
 
-from app.model_client import OllamaModelClient, action_target_ids, allowed_actions
+from app.model_client import ACTION_OUTPUT_SCHEMA, OllamaModelClient, action_target_ids, allowed_actions
 from app.schemas import StepRequest
 from app.settings import Settings
 
@@ -47,7 +47,7 @@ def test_ollama_request_contains_actual_image_and_returns_parsed_action():
     proposal, inference_ms = asyncio.run(run_test())
 
     assert captured_request["model"] == "qwen2.5vl:3b"
-    assert captured_request["format"] == "json"
+    assert captured_request["format"] == ACTION_OUTPUT_SCHEMA
     assert captured_request["messages"][1]["images"] == [make_request().image_base64]
     assert '"in_interaction_range":false' in captured_request["messages"][1]["content"]
     assert "performs approach, pickup" in captured_request["messages"][0]["content"]

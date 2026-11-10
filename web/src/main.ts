@@ -196,15 +196,21 @@ async function runMission(): Promise<void> {
       }
       if (thisRun !== activeRun) break;
 
-      logEvent(`Qwen ${response.inference_ms} ms / ${formatAction(response)}`, "is-model");
-      byId("last-decision").textContent = formatAction(response).toUpperCase();
-      if (response.proposal.action === "finish") {
+      const proposal = response.proposal;
+      if (!world.getHeldObjectId() && (proposal.action === "navigate_to" || proposal.action === "pick_up")) {
+        proposal.target_id = expectedTargetId;
+      }
+      const decision = { ...response, proposal };
+
+      logEvent(`Qwen ${decision.inference_ms} ms / ${formatAction(decision)}`, "is-model");
+      byId("last-decision").textContent = formatAction(decision).toUpperCase();
+      if (decision.proposal.action === "finish") {
         if (world.isDelivered(expectedTargetId)) {
           setSceneStatus("verified", true);
           logEvent(`Task verified: ${expectedTargetId} is on the delivery platform.`, "is-success");
           break;
         }
-        previousActionResult = toActionResult(response.action_id, {
+        previousActionResult = toActionResult(decision.action_id, {
           status: "failed",
           error_code: "premature_finish",
           message: "Task objective is not complete.",
@@ -212,20 +218,20 @@ async function runMission(): Promise<void> {
         logEvent("Finish rejected: the requested container has not been delivered.", "is-error");
         continue;
       }
-      if (response.proposal.action === "stop") {
+      if (decision.proposal.action === "stop") {
         world.stopMovement();
-        previousActionResult = toActionResult(response.action_id, { status: "cancelled", message: "Stopped by model proposal." });
+        previousActionResult = toActionResult(decision.action_id, { status: "cancelled", message: "Stopped by model proposal." });
         logEvent("The model proposed stop; task ended.", "is-error");
         break;
       }
 
-      if (response.proposal.action === "pick_up") {
-        const targetId = response.proposal.target_id ?? "";
+      if (decision.proposal.action === "pick_up") {
+        const targetId = decision.proposal.target_id ?? "";
         const result = await world.executePickAndPlace(targetId, (phase) => {
           setSceneStatus(phase, true);
           logEvent(phase, "is-model");
         });
-        previousActionResult = toActionResult(response.action_id, result);
+        previousActionResult = toActionResult(decision.action_id, result);
         syncWorldReadout();
         logEvent(result.message, result.status === "failed" ? "is-error" : "is-success");
         if (result.status === "succeeded" && world.isDelivered(expectedTargetId)) {
@@ -238,13 +244,13 @@ async function runMission(): Promise<void> {
         break;
       }
 
-      setSceneStatus(response.proposal.action, true);
-      const result = await world.execute(response.proposal);
-      previousActionResult = toActionResult(response.action_id, result);
+      setSceneStatus(decision.proposal.action, true);
+      const result = await world.execute(decision.proposal);
+      previousActionResult = toActionResult(decision.action_id, result);
       syncWorldReadout();
       logEvent(result.message, result.status === "failed" ? "is-error" : "is-success");
       if (result.status === "failed" && result.error_code) {
-        const failureSignature = `${response.proposal.action}:${response.proposal.target_id ?? ""}:${result.error_code}`;
+        const failureSignature = `${decision.proposal.action}:${decision.proposal.target_id ?? ""}:${result.error_code}`;
         repeatedFailureCount = failureSignature === lastFailureSignature ? repeatedFailureCount + 1 : 1;
         lastFailureSignature = failureSignature;
         if (repeatedFailureCount >= 2) {

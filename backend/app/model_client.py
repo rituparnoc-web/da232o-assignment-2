@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from typing import Protocol
 
@@ -11,6 +12,19 @@ from app.schemas import ActionProposal, StepRequest
 from app.settings import Settings
 
 ACTION_ADAPTER = TypeAdapter(ActionProposal)
+logger = logging.getLogger(__name__)
+ACTION_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "action": {
+            "type": "string",
+            "enum": ["navigate_to", "pick_up", "place_on", "stop", "finish"],
+        },
+        "target_id": {"type": "string"},
+    },
+    "required": ["action"],
+    "additionalProperties": False,
+}
 SYSTEM_PROMPT = """You control a simulated robot through one action at a time.
 Return only one JSON object with an action from allowed_actions. Include target_id
 for navigate_to, pick_up, and place_on. Target IDs and categories are metadata;
@@ -100,7 +114,7 @@ class OllamaModelClient:
         payload = {
             "model": self._settings.model_name,
             "stream": False,
-            "format": "json",
+            "format": ACTION_OUTPUT_SCHEMA,
             "options": {"temperature": 0},
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
@@ -122,6 +136,15 @@ class OllamaModelClient:
         except httpx.HTTPError as error:
             raise ModelError("model_unavailable", "Vision model service is unavailable") from error
         except (KeyError, TypeError, ValueError, ValidationError) as error:
+            details = (
+                [
+                    {"loc": issue["loc"], "type": issue["type"], "msg": issue["msg"]}
+                    for issue in error.errors(include_input=False)
+                ]
+                if isinstance(error, ValidationError)
+                else type(error).__name__
+            )
+            logger.warning("Invalid Ollama model response: %s", details)
             raise ModelError("invalid_model_output", "Vision model returned an invalid action") from error
 
         inference_ms = round((time.perf_counter() - started) * 1000)

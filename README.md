@@ -81,5 +81,12 @@ Qwen2.5-VL 3B is the verified model. A cold response has ranged from about 29 to
 
 - If the header reports `API OFFLINE`, confirm the backend is listening at `127.0.0.1:8000` and check `GET /health`.
 - If the model is not ready, start Ollama and confirm `ollama list` includes `qwen2.5vl:3b`.
+- If Qwen returns an empty action and Ollama logs `Unexpected empty grammar stack` or repeated tokens, stop Ollama and try CPU-only inference. On the tested Windows NVIDIA system, start Ollama in a new PowerShell terminal with:
+	```powershell
+	$env:OLLAMA_VULKAN = "0"
+	$env:CUDA_VISIBLE_DEVICES = "-1"
+	ollama serve
+	```
+	CPU inference may be slower. These settings apply to that terminal session only.
 - If a model request times out, allow additional time for cold inference or set `VLM_TIMEOUT_SECONDS` before starting the backend.
 - If the 3D view is blank, use a browser with WebGL and hardware acceleration enabled.
