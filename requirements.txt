@@ -12,3 +12,4 @@ python-dotenv>=1.0
 pyyaml>=6.0
 pillow>=10.3
 requests>=2.32        # used by tools/fake_unity.py (Unity stand-in for testing)
+matplotlib>=3.8          # eval/analyze.py charts

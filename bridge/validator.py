@@ -6,7 +6,7 @@ The model only chooses WHAT to do; here we make sure the choice is well-formed:
   3. required fields for that action are present
   4. every referenced name is a known scene object
   5. type rules (pick/place object = item, open/close target = container,
-     place location = surface|container)
+     place location = surface|container|location)
 Preconditions like reach and gripper state are checked in Unity.
 """
 from __future__ import annotations
@@ -23,7 +23,7 @@ ACTIONS = {"move_to", "pick", "place", "open", "close", "look_around", "done"}
 REQUIRED: dict[str, dict[str, Optional[set[str]]]] = {
     "move_to": {"target": None},
     "pick": {"object": {"item"}},
-    "place": {"object": {"item"}, "location": {"surface", "container"}},
+    "place": {"object": {"item"}, "location": {"surface", "container", "location"}},
     "open": {"target": {"container"}},
     "close": {"target": {"container"}},
     "look_around": {},

@@ -19,7 +19,7 @@ from PIL import Image
 from pydantic import BaseModel, Field, field_validator
 
 from logger import RunLogger
-from prompts import SYSTEM_PROMPT, build_user_prompt, repetition_warning
+from prompts import PROMPT_VERSION, SYSTEM_PROMPT, build_user_prompt, repetition_warning
 from settings import load_settings
 from validator import Command, ValidationError, validate
 from vlm import VLMClient, VLMError
@@ -167,7 +167,7 @@ def _prepare_image(b64: str) -> bytes:
 # ---------------------------------------------------------------- endpoints
 @app.get("/health")
 def health():
-    return {"status": "ok", "backend": vlm.backend_name, "model": vlm.model}
+    return {"status": "ok", "backend": vlm.backend_name, "model": vlm.model, "prompt": PROMPT_VERSION}
 
 
 @app.post("/episode/start")
@@ -259,7 +259,7 @@ def episode_end(req: EpisodeEndReq):
         "episode_id": ep.id, "task_id": ep.task_id, "backend": vlm.backend_name, "model": vlm.model,
         "task": ep.task, "success": req.success, "steps": req.steps,
         "total_latency_ms": ep.total_latency_ms, "invalid_count": ep.invalid_count,
-        "reason": req.reason, "started": ep.started,
+        "reason": req.reason, "started": ep.started, "prompt": PROMPT_VERSION,
         "ended": datetime.now().isoformat(timespec="seconds"),
     })
     log.info("Episode %s ended: success=%s steps=%d (%s)", ep.id, req.success, req.steps, req.reason)

@@ -3,7 +3,7 @@
 **Project codename:** HabitatVLM
 **Owner:** Supratim
 **Version:** 0.2 (6 Nov 2026)
-**Status:** Phases 0–5 verified (9 Nov): bridge, Kaggle backend, image link, robot skills. Phase 6 (agent loop) in progress; Phase 9 (any room + 5 new rooms) planned
+**Status:** Phases 0–6 verified (9 Nov): bridge, Kaggle backend, image link, robot skills, agent loop. Phase 8 tooling written (12 Nov): 24-task suite, TaskRunner, SceneReset, `eval/analyze.py`; suite runs pending. Phase 7 (Gemini) and Phase 9 (any room + 5 new rooms) planned
 
 **Changes in 0.2**
 - Build order changed: **bridge → Kaggle backend → Unity image link → robot skills** (see PLAN).
@@ -146,6 +146,21 @@ Built automatically by the editor menu **HabitatVLM → Build Habitat Room** (`A
 - No script may name a specific object or position. Exceptions, clearly marked as test/demo tools: `HabitatBuilder` (builds room 01), the bridge `mock` script, `KeyboardDebug` presets, and per-room task files.
 - Supported object types: **item**, **surface**, **container** (hinged door), plus static **obstacles**. New interaction types (drawers, buttons…) need a new skill. That is by design: the VLM decides *what*, Unity decides *how*.
 - Generalisation is shown by testing the unchanged code in 5 additional rooms (PLAN Phase 9). Removing object names from the prompt (pure image grounding, "option B") stays a stretch goal.
+
+### 5.7 Control modes and on-screen UI (added 12 Nov)
+
+A sidebar on the right (`ControlPanel`) holds all UI. The main camera's viewport is shrunk so the panel sits beside the room instead of covering it; `>` or Tab hides it. Four mode buttons; in each mode **only that kind of input** is accepted, and modes are locked while the VLM runs:
+
+| Mode | Input | Who decides | Notes |
+|---|---|---|---|
+| Tasks | Preset task / suite; debug keys 1–0, R, H | VLM | Success checked by Unity (§11); used for evaluation |
+| Text | Typed command, Enter (↑/↓ history) | VLM | Continues from the current room state; logged as `TEXT`, success unverified |
+| Click | Mouse: floor → walk there (`GoToPoint`), object → `move_to` | User | No VLM; a target marker shows on the floor |
+| Point+Say | Click object = "this", 2nd object = "there", then a typed command | VLM | Unity adds `(the user pointed at objects: "this" = X, "there" = Y)` to the command; logged as `POINT` |
+
+Clicks are read only inside the room view (not on the sidebar) and never during an episode. Click-to-move is a UI feature, not part of the VLM action vocabulary (§6).
+
+**Locations (kind `location`, added 12 Nov):** named spots on the floor, shown as flat discs and created at runtime in any room. `home_base` (grey) is the robot's start position ("return to base"). `marked_spot` (orange) is put where the user clicks the floor in Point+Say mode. `move_to(location)` stands on the spot; `place(item, location)` puts the item on the floor in front of the robot there; items there are reported as "on the floor at X". Prompt v3.2 explains locations to the model.
 
 ---
 
@@ -315,10 +330,13 @@ Frames: `logs/frames/<episode_id>/<step>.jpg` (exactly what the model saw).
 | `Interactable.cs` | `Scripts/Robot` | Every interactable | Kind, snap point, open state, current location of items, name registry | Written |
 | `Cabinet.cs` | `Scripts/Robot` | Each cabinet | Open/close by rotating the hinge (coroutine, about 1 s) | Written |
 | `RobotSkills.cs` | `Scripts/Robot` | Robot | `MoveTo`, `Pick`, `Place`, `Open`, `Close`, `LookAround` → `SkillResult`; `Execute(action,…)`; `GetState()` → robot_state | Written |
-| `KeyboardDebug.cs` | `Scripts/Robot` | Robot (dev only) | Keys 1–0 run skills, R resets the scene, on-screen state/log | Written |
-| `AgentLoop.cs` | `Scripts/Agent` | `AgentManager` | Episode loop: capture → step → execute → repeat; step limit; success check; on-screen panel (task presets, Start/Stop/Reset) | Written |
+| `KeyboardDebug.cs` | `Scripts/Robot` | Robot (dev only) | Keys 1–0 run skills, R resets the scene; Tasks mode only; H shows help (bottom-left) | Written |
+| `AgentLoop.cs` | `Scripts/Agent` | `AgentManager` | Episode engine: capture → step → execute → repeat; step limit; success check; `StartCommand` for typed commands | Written |
+| `ControlPanel.cs` | `Scripts/Agent` | `AgentManager` | Right sidebar (§5.7): mode buttons, camera preview, per-mode controls, status/log; shrinks the main camera viewport | Written |
+| `ClickControl.cs` | `Scripts/Agent` | `AgentManager` | Mouse input for Click (walk / move_to) and Point+Say (this/there labels, `ComposeTask`) | Written |
 | `TaskSpec.cs` | `Scripts/Agent` | — | Task file format + `SuccessChecker` (`item_in`, `item_on`, `container_state`, `holding`, `all`) | Written |
-| `TaskRunner.cs` | `Scripts/Agent` | `AgentManager` | Loads `tasks.json`, runs episodes in sequence for evaluation | To do |
+| `SceneReset.cs` | `Scripts/Agent` | `AgentManager` | Snapshot of items, cabinet doors and robot pose at start; `Restore()` puts the room back without a scene reload | Written |
+| `TaskRunner.cs` | `Scripts/Agent` | `AgentManager` | Runs the room's task file in sequence (reset → episode → next); tier filter, repeats; stops on infrastructure errors; per-tier summary | Written |
 
 All network callbacks run inside coroutines on Unity's main thread. Keyboard input uses the Input System (`Keyboard.current`). The project's Active Input Handling is set to *Both*.
 
@@ -326,7 +344,7 @@ All network callbacks run inside coroutines on Unity's main thread. Keyboard inp
 
 ## 11. Task suite and success conditions
 
-Tasks are defined per room in `Assets/Tasks/tasks_roomXX.json` (`{ "room": ..., "tasks": [...] }`; room 01 has 8 tasks). Condition types: `item_in`, `item_on`, `container_state`, `holding`, `all`. A free-form task typed in the panel has no condition and is logged as *unverified*. Example:
+Tasks are defined per room in `Assets/Tasks/tasks_roomXX.json` (`{ "room": ..., "tasks": [...] }`, each task has `id`, `tier`, `task`, `success`; room 01 has 24 tasks, 8 per tier). Condition types: `item_in`, `item_on`, `container_state`, `holding`, `all`. A free-form task typed in the panel has no condition and is logged as *unverified*. Example:
 ```json
 [
   { "id": "T01", "task": "Open the left cabinet", "success": { "type": "container_state", "target": "cabinet_left", "state": "open" } },
@@ -384,7 +402,7 @@ Final Project - Unity (VLM)/          # repo root
 │       ├── Scripts/Editor/HabitatBuilder.cs
 │       ├── Scripts/Bridge/           # BridgeDtos, BridgeClient, CameraCapture, BridgeImageTest
 │       ├── Scripts/Robot/            # Interactable, Cabinet, RobotSkills, KeyboardDebug
-│       ├── Scripts/Agent/            # AgentLoop, TaskSpec; (to do) TaskRunner
+│       ├── Scripts/Agent/            # AgentLoop, TaskSpec, SceneReset, TaskRunner
 │       ├── Tasks/tasks_room01.json   # task presets + success conditions (one file per room)
 │       ├── Materials/  Textures/RobotCamRT.renderTexture
 ├── bridge/
@@ -396,7 +414,9 @@ Final Project - Unity (VLM)/          # repo root
 ├── kaggle/
 │   └── ollama_server.ipynb
 ├── eval/
-│   └── analyze.py                    # (to do)
+│   ├── analyze.py                    # logs → results.md + charts/
+│   ├── results.md                    # generated
+│   └── charts/                       # generated PNGs
 └── docs/
     └── architecture.png              # (to do)
 ```

@@ -113,16 +113,39 @@ Scope (9 Nov): Kaggle (B) + Gemini (C) only; no local model, no Groq.
 
 ## Phase 8 — Evaluation and documentation (Week 5, ~3–4 days)
 
-- [ ] Write `tasks.json` with 24 tasks (8 Easy, 8 Medium, 8 Hard) and their success conditions (SPEC §11).
-- [ ] `TaskRunner.cs`: reset the scene → run each task → move to the next.
+- [x] `Assets/Tasks/tasks_room01.json`: 24 tasks (8 Easy, 8 Medium, 8 Hard) with success conditions (SPEC §11); all object names checked against the scene.
+- [x] `SceneReset.cs`: soft room reset (items, cabinet doors, robot pose restored from a snapshot taken at start; no scene reload).
+- [x] `TaskRunner.cs`: reset → run each task → next; tier filter (all/easy/medium/hard) and repeats in the panel's **Suite** row ("Run all"); stops on a bridge/backend failure; per-tier summary in the log.
+- [x] Smarter placement (`Interactable.NextPlacePosition`): free-spot grid search on the surface/container so placed items don't overlap.
+- [x] `eval/analyze.py`: `results.md` (summary per backend and tier, per-task matrix, failure categories, failed-episode list) + `charts/success_by_tier.png`, `charts/steps_by_tier.png`. Options `--since`, `--latest`. Tested on the Phase 6 runs.
+- [x] Kaggle notebook: tunnel cell now has a real 60 s timeout (reader thread), tunnel check reports HTTP errors.
+- [ ] Unity: run **HabitatVLM → Setup Interactables and Robot** once (adds SceneReset + TaskRunner), save the scene.
 - [ ] Run the full suite on **B** (Kaggle, primary) and on **C** (watch the daily rate limit; split across days if needed).
-- [ ] `eval/analyze.py`: results table (success % by tier and backend, mean latency, invalid %) and one or two charts.
+- [x] Kaggle suite, prompt v2 (12 Nov): **22/24** (Easy 8/8, Medium 8/8, Hard 6/8), 4.7 s/step, 0 invalid. Failures: T08 wrong cabinet (left/right), T21 walked away holding an item (step limit). Waste: T16 6 extra move_to after done. Unity paused when unfocused → `Application.runInBackground = true` in AgentLoop.
+- [x] Prompt v3 (task parts checked as done/not done, one item at a time, "holding + near destination = place now", match task words to names, warnings for 3x repeats and move_to-only wandering). `episodes.csv` now logs `prompt`; analyze.py compares versions (`--tier hard`).
+- [x] Kaggle suite, prompt v3 (12 Nov): **20/24** (Easy 7/8, Medium 8/8 with fewer wasted steps, Hard 5/8). T21 fixed; T12 regressed (exact-name rule rejected "purple cabinet"); T22/T23 failed on place-from-afar loops.
+- [x] Prompt v3.1: colour/position descriptions allowed again (resolve via image + item locations, reply with exact name).
+- [ ] Optional v4: auto-approach in pick/place/open/close (decision pending).
+- [ ] Re-run the Hard tier with v3 on Kaggle → compare with v2 (ablation for the report). If v3 is not worse, re-run Easy/Medium too.
 - [ ] Review the failures: categorise them (wrong object, wrong order, navigation, invalid JSON) and note 3 lessons.
 - [ ] Record a 2–3 minute demo video (OBS Studio): split view of the robot camera, the scene, and the bridge log.
 - [ ] Write `README.md`: what it is, architecture diagram, setup steps, how to switch backends, results, limitations.
 - [ ] Check every acceptance criterion in SPEC §13. Final commit and tag `v1.0`.
 
 **Checkpoint 8 (project done):** All of SPEC §13 is ticked.
+
+---
+
+## Phase 8b — Interaction modes and UI (added 12 Nov)
+
+- [x] `ControlPanel.cs`: right sidebar beside the room view (main camera viewport shrunk; `>`/Tab hides it). Replaces the panel that covered the scene.
+- [x] Mode buttons **Tasks / Text / Click / Point+Say**; each accepts only its own input; locked while the VLM runs.
+- [x] Text mode: command bar (Enter sends, ↑/↓ history), continues from the current state.
+- [x] Click mode (`ClickControl.cs`, `RobotSkills.GoToPoint`): floor click → walk there with a marker, object click → `move_to`.
+- [x] Point+Say: click "this" (and "there"), type "put this there"; names are added to the command for the VLM.
+- [x] Keyboard debug keys only in Tasks mode; its help box hidden by default (H).
+- [x] Locations (12 Nov, after user test): `home_base` at the robot's start ("return to base" failed: no such object), `marked_spot` from floor clicks in Point+Say ("this"/"there" could only be objects). Validator + prompt v3.2. "Will send" preview in Point+Say.
+- [ ] User test in Unity: each mode once (see checklist in chat 12 Nov). Record a short clip of each for the demo video.
 
 ---
 
