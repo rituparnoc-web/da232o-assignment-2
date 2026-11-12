@@ -68,6 +68,8 @@ The result should show `model_ready: true`. `POST /step` accepts the strict imag
 
 The **Ask VLM** action captures the current scene and sends it with the instruction, visible IDs/categories, interaction-range flags, carry state, and previous result. A validated `pick_up` proposal selects the target; the browser controller then performs a bounded approach/pickup/delivery sequence and independently verifies the scene. The **Manual dispatch** buttons and rover steering provide a deterministic control path for testing.
 
+To deliver to the second room, specify `second room`, `room 2`, or `delivery_02` in the instruction. The rover approaches and opens the initially closed door before entering, and delivery is verified against that room's platform. Without a room designation, the original platform remains the default. For manual delivery, select the desired platform in the scene registry before using **Navigate** and **Place**.
+
 To require a particular table route while carrying a container to the platform, include `north side of the table`, `south side of the table`, `east side of the table`, or `west side of the table` in the instruction. North is negative Z, south is positive Z, east is positive X, and west is negative X. The route uses the scene's fixed table and obstacle layout.
 
 ### Verification

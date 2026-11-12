@@ -19,10 +19,11 @@ interface HabitatTarget {
   root: THREE.Group;
   groundPosition: THREE.Vector3;
   status: "available" | "held" | "delivered";
+  deliveredTo?: string;
   marker: THREE.Mesh;
 }
 
-const floorLimits = { minX: -6.3, maxX: 6.3, minZ: -4.6, maxZ: 4.6 };
+const floorLimits = { minX: -6.3, maxX: 13.7, minZ: -4.6, maxZ: 4.6 };
 const cellSize = 0.5;
 
 function shadow(mesh: THREE.Mesh): THREE.Mesh {
@@ -60,12 +61,16 @@ export class HabitatWorld {
   private readonly camera: THREE.PerspectiveCamera;
   private readonly controls: OrbitControls;
   private readonly robot = new THREE.Group();
+  private readonly door = new THREE.Group();
   private readonly targets = new Map<string, HabitatTarget>();
   private readonly resizeObserver: ResizeObserver;
   private readonly obstacles = [
     { minX: -1.45, maxX: 1.45, minZ: -0.75, maxZ: 1.25 },
     { minX: 2.25, maxX: 3.45, minZ: 1.7, maxZ: 2.55 },
+    { minX: 7.01, maxX: 7.29, minZ: -5.35, maxZ: -1.5 },
+    { minX: 7.01, maxX: 7.29, minZ: 1.5, maxZ: 5.35 },
   ];
+  private doorOpen = false;
   private carryId: string | null = null;
   private movementToken = 0;
   private frameId = 0;
@@ -74,7 +79,7 @@ export class HabitatWorld {
     this.host = host;
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color("#10272b");
-    this.scene.fog = new THREE.Fog("#10272b", 17, 35);
+    this.scene.fog = new THREE.Fog("#10272b", 30, 75);
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 80);
     this.camera.position.set(10.5, 10.2, 12.8);
     this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: false });
@@ -88,11 +93,11 @@ export class HabitatWorld {
     host.replaceChildren(this.renderer.domElement);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.target.set(0, 0.25, -0.25);
+    this.controls.target.set(3.2, 0.25, -0.25);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.07;
     this.controls.minDistance = 8;
-    this.controls.maxDistance = 35;
+    this.controls.maxDistance = 60;
     this.controls.maxPolarAngle = Math.PI * 0.47;
 
     this.buildLighting();
@@ -130,11 +135,11 @@ export class HabitatWorld {
 
   private buildHabitat(): void {
     const floor = shadow(new THREE.Mesh(
-      new THREE.PlaneGeometry(14.5, 10.5),
+      new THREE.PlaneGeometry(21.75, 10.5),
       new THREE.MeshStandardMaterial({ color: "#20393c", roughness: 0.87, metalness: 0.08 }),
     ));
     floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -0.04;
+    floor.position.set(3.625, -0.04, 0);
     this.scene.add(floor);
 
     const grid = new THREE.GridHelper(14, 28, "#5c7975", "#355153");
@@ -143,19 +148,39 @@ export class HabitatWorld {
     gridMaterial.transparent = true;
     gridMaterial.opacity = 0.45;
     this.scene.add(grid);
+    const secondGrid = new THREE.GridHelper(7, 14, "#5c7975", "#355153");
+    secondGrid.position.set(10.75, 0.015, 0);
+    const secondGridMaterial = secondGrid.material as THREE.Material;
+    secondGridMaterial.transparent = true;
+    secondGridMaterial.opacity = 0.45;
+    this.scene.add(secondGrid);
 
     const wallMaterial = new THREE.MeshStandardMaterial({ color: "#294447", roughness: 0.82 });
-    const backWall = shadow(new THREE.Mesh(new THREE.BoxGeometry(14.5, 2.6, 0.28), wallMaterial));
-    backWall.position.set(0, 1.25, -5.35);
+    const backWall = shadow(new THREE.Mesh(new THREE.BoxGeometry(21.75, 2.6, 0.28), wallMaterial));
+    backWall.position.set(3.625, 1.25, -5.35);
     this.scene.add(backWall);
-    for (const x of [-7.15, 7.15]) {
+    for (const x of [-7.15, 14.4]) {
       const side = shadow(new THREE.Mesh(new THREE.BoxGeometry(0.28, 2.6, 10.5), wallMaterial));
       side.position.set(x, 1.25, 0);
       this.scene.add(side);
     }
+    for (const z of [-3.375, 3.375]) {
+      const partition = shadow(new THREE.Mesh(new THREE.BoxGeometry(0.28, 2.6, 3.75), wallMaterial));
+      partition.position.set(7.15, 1.25, z);
+      this.scene.add(partition);
+    }
+    const doorPanel = shadow(new THREE.Mesh(
+      new THREE.BoxGeometry(0.24, 2.4, 3),
+      new THREE.MeshStandardMaterial({ color: "#78928a", roughness: 0.55, metalness: 0.35 }),
+    ));
+    doorPanel.position.set(0, 1.2, 1.5);
+    this.door.position.set(7.15, 0, -1.5);
+    this.door.add(doorPanel);
+    this.scene.add(this.door);
 
     this.addZone("STORAGE", -3.4, -2.8, 5.2, 3.2, "#24504e");
     this.addZone("DELIVERY", 4.45, -2.8, 3.0, 3.2, "#3e5040");
+    this.addZone("ROOM 2 / DELIVERY", 11.2, -2.8, 4.0, 3.2, "#3e5040");
     this.addBench();
     this.addWallMarkings();
   }
@@ -246,6 +271,7 @@ export class HabitatWorld {
     this.addContainer("object_02", "Red tote", "#e46855", "RED / CONTAINER", -2.75, -2.75);
     this.addContainer("object_03", "Yellow tote", "#e5bf49", "YELLOW / CONTAINER", -1.05, -2.75);
     this.addPlatform("delivery_01", 4.55, -2.75);
+    this.addPlatform("delivery_02", 11.2, -2.75);
   }
 
   private addContainer(id: string, label: string, color: string, detail: string, x: number, z: number): void {
@@ -311,7 +337,7 @@ export class HabitatWorld {
     this.scene.add(root);
     this.targets.set(id, {
       id,
-      label: "Delivery platform",
+      label: id === "delivery_02" ? "Room 2 delivery platform" : "Delivery platform",
       category: "platform",
       color: "#a5cf74",
       root,
@@ -393,7 +419,7 @@ export class HabitatWorld {
     this.camera.aspect = aspect;
     this.camera.updateProjectionMatrix();
     const direction = this.camera.position.clone().sub(this.controls.target).normalize();
-    this.camera.position.copy(this.controls.target).addScaledVector(direction, aspect < 1 ? 27 : 19.5);
+    this.camera.position.copy(this.controls.target).addScaledVector(direction, aspect < 1 ? 38 / aspect : 25);
     this.renderer.setSize(width, height, false);
   }
 
@@ -429,8 +455,9 @@ export class HabitatWorld {
     return this.renderer.domElement.toDataURL("image/jpeg", 0.78).split(",", 2)[1] ?? "";
   }
 
-  isDelivered(id: string): boolean {
-    return this.targets.get(id)?.status === "delivered";
+  isDelivered(id: string, platformId?: string): boolean {
+    const target = this.targets.get(id);
+    return target?.status === "delivered" && (!platformId || target.deliveredTo === platformId);
   }
 
   stopMovement(): void {
@@ -458,7 +485,7 @@ export class HabitatWorld {
     }
   }
 
-  async executePickAndPlace(targetId: string, onPhase: (phase: string) => void, tableSide?: TableSide): Promise<ExecutionResult> {
+  async executePickAndPlace(targetId: string, onPhase: (phase: string) => void, tableSide?: TableSide, platformId = "delivery_01"): Promise<ExecutionResult> {
     const target = this.targets.get(targetId);
     if (!target || target.category !== "container" || target.status === "delivered") {
       return { status: "failed", target_id: targetId, error_code: "unknown_target", message: "Selected container is not available." };
@@ -485,11 +512,11 @@ export class HabitatWorld {
     }
 
     onPhase("Approaching delivery platform");
-    const deliveryApproach = await this.navigateTo("delivery_01");
+    const deliveryApproach = await this.navigateTo(platformId, onPhase);
     if (deliveryApproach.status !== "succeeded") return deliveryApproach;
 
     onPhase("Placing container on delivery platform");
-    return this.placeOn("delivery_01");
+    return this.placeOn(platformId);
   }
 
   async goAroundTable(side: TableSide): Promise<ExecutionResult> {
@@ -509,10 +536,34 @@ export class HabitatWorld {
     return { status: "succeeded", message: `Rover passed the ${side} side of the table.` };
   }
 
-  private async navigateTo(id: string): Promise<ExecutionResult> {
+  private async navigateTo(id: string, onPhase?: (phase: string) => void): Promise<ExecutionResult> {
     const target = this.targets.get(id);
     if (!target || target.status === "delivered") {
       return { status: "failed", target_id: id, error_code: "unknown_target", message: "Target is not available." };
+    }
+    if (!this.doorOpen && target.groundPosition.x > 7.15) {
+      onPhase?.("Approaching room 2 door");
+      const approach = await this.walkPath(new THREE.Vector3(6, 0, 0));
+      if (approach.status !== "succeeded") return approach;
+      onPhase?.("Opening room 2 door");
+      const token = ++this.movementToken;
+      const opened = await new Promise<boolean>((resolve) => {
+        const start = performance.now();
+        const step = (now: number) => {
+          if (token !== this.movementToken) {
+            this.door.rotation.y = 0;
+            resolve(false);
+            return;
+          }
+          const progress = Math.min(1, (now - start) / 800);
+          this.door.rotation.y = progress * Math.PI / 2;
+          if (progress === 1) resolve(true);
+          else requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      });
+      if (!opened) return { status: "cancelled", error_code: "cancelled", message: "Door opening cancelled." };
+      this.doorOpen = true;
     }
     const away = this.robot.position.clone().sub(target.groundPosition).setY(0);
     if (away.lengthSq() < 0.01) away.set(0, 0, 1);
@@ -560,9 +611,10 @@ export class HabitatWorld {
     carried.root.position.y = 0.52;
     carried.root.rotation.set(0, 0, 0);
     carried.status = "delivered";
+    carried.deliveredTo = id;
     const placedId = this.carryId;
     this.carryId = null;
-    return { status: "succeeded", target_id: id, message: `Placed ${carried.label} on delivery platform (${placedId}).` };
+    return { status: "succeeded", target_id: id, message: `Placed ${carried.label} on ${platform.label} (${placedId}).` };
   }
 
   private async walkPath(destination: THREE.Vector3): Promise<ExecutionResult> {
@@ -604,7 +656,8 @@ export class HabitatWorld {
         const blocked = this.obstacles.some((obstacle) =>
           worldX > obstacle.minX - 0.38 && worldX < obstacle.maxX + 0.38
           && worldZ > obstacle.minZ - 0.38 && worldZ < obstacle.maxZ + 0.38,
-        );
+        ) || (!this.doorOpen && worldX > 6.63 && worldX < 7.67 && worldZ > -1.88 && worldZ < 1.88)
+          || (this.doorOpen && worldX > 6.77 && worldX < 10.53 && worldZ > -2 && worldZ < -1);
         if (blocked) continue;
         previous.set(nextKey, key(x, z));
         queue.push([nx, nz]);

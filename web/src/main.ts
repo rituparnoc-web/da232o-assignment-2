@@ -34,6 +34,7 @@ const targetDetails = [
   { id: "object_02", name: "Red tote", detail: "Thermal seal / 9kg", color: "#e46855" },
   { id: "object_03", name: "Yellow tote", detail: "Survey kit / 6kg", color: "#e5bf49" },
   { id: "delivery_01", name: "Delivery platform", detail: "Transfer zone / bay A", color: "#a5cf74" },
+  { id: "delivery_02", name: "Room 2 platform", detail: "Transfer zone / bay B", color: "#a5cf74" },
 ];
 
 function logEvent(message: string, kind = "normal"): void {
@@ -128,9 +129,16 @@ function toActionResult(actionId: string, result: ExecutionResult): ActionResult
 
 function expectedTargetFor(text: string): string {
   const normalized = text.toLowerCase();
+  const explicitId = normalized.match(/\bobject_0[123]\b/)?.[0];
+  if (explicitId) return explicitId;
   if (normalized.includes("red")) return "object_02";
   if (normalized.includes("yellow")) return "object_03";
   return "object_01";
+}
+
+function expectedPlatformFor(text: string): string {
+  return /\b(?:second|2nd)\s+(?:room|delivery\s+platform|platform)\b|\broom\s*(?:2|02|two)\b|\b(?:delivery_02|other room)\b/i.test(text)
+    ? "delivery_02" : "delivery_01";
 }
 
 async function doManualAction(action: { action: "navigate_to" | "pick_up" | "place_on"; target_id: string }): Promise<void> {
@@ -147,7 +155,14 @@ async function runMission(): Promise<void> {
   if (!taskText || running) return;
   const requestedSide = taskText.match(/\b(north|south|east|west)\s+side\s+of\s+(?:the\s+)?table\b/i)?.[1]?.toLowerCase();
   const tableSide = requestedSide as TableSide | undefined;
-  let tableRouteCompleted = false;
+  const expectedTargetId = expectedTargetFor(taskText);
+  const expectedPlatformId = expectedPlatformFor(taskText);
+  const heldObjectId = world.getHeldObjectId();
+  if (heldObjectId && heldObjectId !== expectedTargetId) {
+    logEvent(`Cannot deliver ${expectedTargetId} while carrying ${heldObjectId}.`, "is-error");
+    setSceneStatus("wrong container");
+    return;
+  }
   running = true;
   currentStep = 0;
   previousActionResult = null;
@@ -156,7 +171,6 @@ async function runMission(): Promise<void> {
   activeRun += 1;
   const thisRun = activeRun;
   const sessionId = crypto.randomUUID();
-  const expectedTargetId = expectedTargetFor(taskText);
   currentAbort = new AbortController();
   setRunButtonBusy(true);
   stopButton.disabled = false;
@@ -203,14 +217,17 @@ async function runMission(): Promise<void> {
       if (!world.getHeldObjectId() && (proposal.action === "navigate_to" || proposal.action === "pick_up")) {
         proposal.target_id = expectedTargetId;
       }
+      if (world.getHeldObjectId() && (proposal.action === "navigate_to" || proposal.action === "place_on")) {
+        proposal.target_id = expectedPlatformId;
+      }
       const decision = { ...response, proposal };
 
       logEvent(`Qwen ${decision.inference_ms} ms / ${formatAction(decision)}`, "is-model");
       byId("last-decision").textContent = formatAction(decision).toUpperCase();
       if (decision.proposal.action === "finish") {
-        if (world.isDelivered(expectedTargetId)) {
+        if (world.isDelivered(expectedTargetId, expectedPlatformId)) {
           setSceneStatus("verified", true);
-          logEvent(`Task verified: ${expectedTargetId} is on the delivery platform.`, "is-success");
+          logEvent(`Task verified: ${expectedTargetId} is on ${expectedPlatformId}.`, "is-success");
           break;
         }
         previousActionResult = toActionResult(decision.action_id, {
@@ -228,39 +245,25 @@ async function runMission(): Promise<void> {
         break;
       }
 
-      if (decision.proposal.action === "pick_up") {
-        const targetId = decision.proposal.target_id ?? "";
+      if (decision.proposal.action === "pick_up" || (world.getHeldObjectId()
+          && (decision.proposal.action === "navigate_to" || decision.proposal.action === "place_on"))) {
+        const targetId = world.getHeldObjectId() ?? decision.proposal.target_id ?? "";
         const result = await world.executePickAndPlace(targetId, (phase) => {
           setSceneStatus(phase, true);
           logEvent(phase, "is-model");
-        }, tableSide);
+        }, tableSide, expectedPlatformId);
+        if (thisRun !== activeRun) break;
         previousActionResult = toActionResult(decision.action_id, result);
         syncWorldReadout();
         logEvent(result.message, result.status === "failed" ? "is-error" : "is-success");
-        if (result.status === "succeeded" && world.isDelivered(expectedTargetId)) {
+        if (result.status === "succeeded" && world.isDelivered(expectedTargetId, expectedPlatformId)) {
           setSceneStatus("verified", true);
-          logEvent(`Task verified: ${expectedTargetId} is on the delivery platform.`, "is-success");
+          logEvent(`Task verified: ${expectedTargetId} is on ${expectedPlatformId}.`, "is-success");
           break;
         }
         if (result.status !== "succeeded") break;
         logEvent(`Wrong object delivered; expected ${expectedTargetId}.`, "is-error");
         break;
-      }
-
-      if (tableSide && !tableRouteCompleted && world.getHeldObjectId()
-          && (decision.proposal.action === "place_on"
-            || (decision.proposal.action === "navigate_to" && decision.proposal.target_id === "delivery_01"))) {
-        setSceneStatus(`table / ${tableSide}`, true);
-        const route = await world.goAroundTable(tableSide);
-        logEvent(route.message, route.status === "succeeded" ? "is-success" : "is-error");
-        if (route.status !== "succeeded") break;
-        tableRouteCompleted = true;
-        if (decision.proposal.action === "place_on") {
-          setSceneStatus("approaching delivery platform", true);
-          const approach = await world.execute({ action: "navigate_to", target_id: decision.proposal.target_id });
-          logEvent(approach.message, approach.status === "succeeded" ? "is-success" : "is-error");
-          if (approach.status !== "succeeded") break;
-        }
       }
 
       setSceneStatus(decision.proposal.action, true);
@@ -323,7 +326,7 @@ function bindManualControls(): void {
     void doManualAction({ action: "pick_up", target_id: selectedTarget });
   });
   byId("place-target").addEventListener("click", () => {
-    void doManualAction({ action: "place_on", target_id: "delivery_01" });
+    void doManualAction({ action: "place_on", target_id: selectedTarget.startsWith("delivery_") ? selectedTarget : "delivery_01" });
   });
   const movement: Array<[string, number, number]> = [
     ["move-north", 0, -0.9], ["move-south", 0, 0.9], ["move-west", -0.9, 0], ["move-east", 0.9, 0],
