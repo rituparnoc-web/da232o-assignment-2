@@ -145,7 +145,7 @@ Built automatically by the editor menu **HabitatVLM → Build Habitat Room** (`A
 - **The Unity scene is the single source of truth.** Every interactable object describes itself with an `Interactable` component (kind, snap point; containers also their door). At Play, Unity discovers the objects in the loaded room and sends their names and kinds to the bridge in `/episode/start`.
 - No script may name a specific object or position. Exceptions, clearly marked as test/demo tools: `HabitatBuilder` (builds room 01), the bridge `mock` script, `KeyboardDebug` presets, and per-room task files.
 - Supported object types: **item**, **surface**, **container** (hinged door), plus static **obstacles**. New interaction types (drawers, buttons…) need a new skill. That is by design: the VLM decides *what*, Unity decides *how*.
-- Generalisation is shown by testing the unchanged code in 5 additional rooms (PLAN Phase 9). Removing object names from the prompt (pure image grounding, "option B") stays a stretch goal.
+- Generalisation is shown by testing the unchanged code in 5 additional rooms built from JSON layouts (`Assets/Rooms/room_0X.json`, `RoomBuilder.cs`; PLAN Phase 9): storage bay, science lab, galley, plus a study corner and a bedroom modelled on the user's reference photos. Containers can be hinged-door cabinets, lidded tubs (lid hinges up about a horizontal axis) or open-top baskets (always open; open/close reports that there is nothing to open). Decor objects are visual only. Removing object names from the prompt (pure image grounding, "option B") stays a stretch goal.
 
 ### 5.7 Control modes and on-screen UI (added 12 Nov)
 
@@ -375,10 +375,10 @@ Unity, not the VLM, decides success at `done` or when the step limit is reached.
 
 ## 13. Acceptance criteria (MVP)
 
-- [ ] AC1. Robot completes all **Easy** tasks with backend B (Kaggle) at ≥ 80% success.
+- [x] AC1. *(Easy 8/8 with v2, 12 Nov)* Robot completes all **Easy** tasks with backend B (Kaggle) at ≥ 80% success.
 - [ ] AC2. At least one **Medium** task succeeds end-to-end on each of B (Kaggle) and C (Gemini).
 - [ ] AC3. Invalid VLM output never crashes Unity or the bridge. *(bridge side verified with malformed replies and a dead backend)*
-- [ ] AC4. `steps.csv` and `episodes.csv` are produced for every run.
+- [x] AC4. `steps.csv` and `episodes.csv` are produced for every run.
 - [ ] AC5. A results table compares the backends: success %, mean latency, invalid-output %.
 - [ ] AC6. The README explains setup from a fresh clone in ≤ 15 steps, with an architecture diagram and a demo video link.
 

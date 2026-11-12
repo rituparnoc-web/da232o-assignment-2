@@ -51,6 +51,8 @@ def classify_failure(ep: dict, steps: list[dict]) -> str:
         return "infrastructure (bridge/model unreachable)"
     if "stopped by user" in r:
         return "stopped by user"
+    if "cannot do this" in r:
+        return "model said the task is not possible"
     if "model said done" in r:
         return "said done too early / wrong result"
     if "step limit" in r:
@@ -150,9 +152,9 @@ def main() -> None:
         )
 
     # ---------------------------------------------------------------- per task
-    lines += ["", "## Per task", "", "| Task | Tier | Instruction | " + " | ".join(backends) + " |",
-              "|---|---|---|" + "---|" * len(backends)]
-    for tid, t in sorted(tasks.items(), key=lambda kv: (TIERS.index(kv[1]["tier"]), kv[0])):
+    lines += ["", "## Per task", "", "| Room | Task | Tier | Instruction | " + " | ".join(backends) + " |",
+              "|---|---|---|---|" + "---|" * len(backends)]
+    for tid, t in sorted(tasks.items(), key=lambda kv: (kv[1]["room"], TIERS.index(kv[1]["tier"]), kv[0])):
         cells = []
         for b in backends:
             eps = [e for e in episodes if e["backend"] == b and e["task_id"] == tid]
@@ -163,7 +165,19 @@ def main() -> None:
             avg = sum(e["n_steps"] for e in eps) / len(eps)
             cells.append(f"{'✅' if ok == len(eps) else '❌' if ok == 0 else '◐'} {ok}/{len(eps)} · {avg:.0f} steps")
         if any(c != "–" for c in cells):
-            lines.append(f"| {tid} | {t['tier']} | {t['task']} | " + " | ".join(cells) + " |")
+            lines.append(f"| {t['room']} | {tid} | {t['tier']} | {t['task']} | " + " | ".join(cells) + " |")
+
+    # ---------------------------------------------------------------- per room (when more than one room was run)
+    rooms = sorted({tasks[e["task_id"]]["room"] for e in episodes})
+    if len(rooms) > 1:
+        lines += ["", "## Per room", "", "| Room | " + " | ".join(backends) + " |", "|---|" + "---|" * len(backends)]
+        for room in rooms:
+            cells = []
+            for b in backends:
+                eps = [e for e in episodes if e["backend"] == b and tasks[e["task_id"]]["room"] == room]
+                ok = sum(e["ok"] for e in eps)
+                cells.append(f"{ok}/{len(eps)} ({pct(ok, len(eps))})" if eps else "–")
+            lines.append(f"| {room} | " + " | ".join(cells) + " |")
 
     # ---------------------------------------------------------------- failures
     lines += ["", "## Failure analysis", ""]

@@ -22,12 +22,21 @@ image + item locations, reply with the exact name.
 v3.2 (12 Nov): "locations" = named spots on the floor (Unity kind "location"):
 home_base (where the robot started; "base", "home", "start") and marked_spot (a floor
 point the user clicked). move_to stands on it; place puts the item on the floor there.
+
+v3.3 (12 Nov): "move this to there" (mug -> marked_spot) ended holding the mug at the spot.
+Rule: move/put/bring X to Y is done only when X is PLACED at Y, not while holding it.
+
+v3.4 (12 Nov, rooms 05/06): "move this to there" with "this" = wicker_basket (furniture)
+-> tried pick(wicker_basket), then carried the red_book inside it instead; "open the door"
+(decor, not in the list) -> "done" and was logged as success. Rule: furniture cannot be
+carried, objects outside the list cannot be used -> reply done with a thought starting
+"CANNOT:" (Unity then logs the episode as not done).
 """
 from __future__ import annotations
 
 from typing import Any
 
-PROMPT_VERSION = "v3.2"
+PROMPT_VERSION = "v3.4"
 
 SYSTEM_PROMPT = """You control a robot in a space habitat. You see the robot's camera image.
 Each turn choose exactly ONE next action from: move_to, pick, place, open, close, look_around, done.
@@ -49,11 +58,13 @@ How to decide:
 
 Rules:
 - Only use object names from the provided list. Never invent names.
+- Only items can be picked up and carried. Surfaces and containers are furniture: they never move. If the task asks to carry furniture, or needs an object that is not in the list (e.g. a door, a window), do NOT do something else instead: reply "done" with a thought that starts with "CANNOT:" and says why.
 - Do exactly what the task asks, nothing more. Do not start other tasks.
 - Never undo progress: do not put down an item the task asked you to pick up, do not take an item out of where the task asked you to put it, do not close a container the task asked you to open.
 - To pick, place, open or close something you must be near it (move_to it first).
 - A container must be open before placing items into it or picking items from it.
 - If an action failed, read the reason and fix the cause instead of repeating it.
+- "Move / put / bring / take X to Y" is complete only when X has been PLACED at Y. Holding X near Y is not enough. "Pick up X" is complete while holding X.
 - The robot holds ONE item at a time. For several items: pick one -> move_to its destination -> place it -> then go back for the next.
 - If you are holding an item and you are near the place the task wants it, place it NOW (open the container first if it is closed). Do not walk away while holding it.
 - Tasks may describe objects by name, colour or position (e.g. "the purple cabinet", "the canister on the table"). Use the image and ITEM LOCATIONS to decide which listed object is meant, then use its exact name in your reply. Before a place, check the location is the one the task means.

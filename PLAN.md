@@ -19,9 +19,9 @@ my_env\Scripts\python.exe -m pip install -r requirements.txt
 - [x] Unity Hub + Unity 6 (6000.6.7f1), URP project in `Unity (VLM Project)/`.
 - [x] Python 3.11 venv `my_env/`; bridge dependencies installed from `requirements.txt` (exact versions in `requirements.lock.txt`).
 - [x] `.gitignore` created for the real folder names (Unity `Library/`, `Logs/`, `my_env/`, `.env`, `logs/` …).
-- [ ] Kaggle account → **phone-verify** it (needed to turn on Internet in notebooks).
-- [ ] Optional: Google AI Studio → Gemini API key (backup backend C).
-- [ ] `git init` → first commit (check `git status` shows no `Library/`, `my_env/` or `.env`).
+- [x] Kaggle account → **phone-verify** it (needed to turn on Internet in notebooks).
+- [x] Optional: Google AI Studio → Gemini API key (backup backend C).
+- [x] `git init` → first commit (check `git status` shows no `Library/`, `my_env/` or `.env`).
 
 ---
 
@@ -54,13 +54,13 @@ To test without a model, first run `$env:VLM_BACKEND="mock"` (PowerShell) or `se
 
 ## Phase 3 — Kaggle VLM backend (B) ✅ (done 6 Nov)
 
-- [ ] kaggle.com → *Create* → *New Notebook* → *File → Import Notebook* → `kaggle/ollama_server.ipynb`.
-- [ ] Session options: **GPU T4 x2**, **Internet On** → *Run All*.
-- [ ] Cell 4 (local image test) should list the red/purple objects. Note the 2nd-call latency.
-- [ ] Copy the printed `KAGGLE_TUNNEL_URL=...` line into `bridge/.env` (copy `.env.example` → `.env` first).
-- [ ] `config.yaml`: `active_backend: kaggle` → restart the bridge → `fake_unity.py`.
-- [ ] Optional: `fake_unity.py --image <a screenshot of the scene>` to see how the model reads a real frame.
-- [ ] **Stop the Kaggle session when finished** (Run → Stop session).
+- [x] kaggle.com → *Create* → *New Notebook* → *File → Import Notebook* → `kaggle/ollama_server.ipynb`.
+- [x] Session options: **GPU T4 x2**, **Internet On** → *Run All*.
+- [x] Cell 4 (local image test) should list the red/purple objects. Note the 2nd-call latency.
+- [x] Copy the printed `KAGGLE_TUNNEL_URL=...` line into `bridge/.env` (copy `.env.example` → `.env` first).
+- [x] `config.yaml`: `active_backend: kaggle` → restart the bridge → `fake_unity.py`.
+- [~] Skipped (real Unity frames used instead): `fake_unity.py --image <a screenshot of the scene>` to see how the model reads a real frame.
+- [x] **Stop the Kaggle session when finished** (Run → Stop session).
 
 **Checkpoint 3:** `fake_unity.py` gets `valid=True` replies from `qwen3-vl:8b` on Kaggle, and the Kaggle monitor cell shows the requests arriving.
 
@@ -119,14 +119,15 @@ Scope (9 Nov): Kaggle (B) + Gemini (C) only; no local model, no Groq.
 - [x] Smarter placement (`Interactable.NextPlacePosition`): free-spot grid search on the surface/container so placed items don't overlap.
 - [x] `eval/analyze.py`: `results.md` (summary per backend and tier, per-task matrix, failure categories, failed-episode list) + `charts/success_by_tier.png`, `charts/steps_by_tier.png`. Options `--since`, `--latest`. Tested on the Phase 6 runs.
 - [x] Kaggle notebook: tunnel cell now has a real 60 s timeout (reader thread), tunnel check reports HTTP errors.
-- [ ] Unity: run **HabitatVLM → Setup Interactables and Robot** once (adds SceneReset + TaskRunner), save the scene.
-- [ ] Run the full suite on **B** (Kaggle, primary) and on **C** (watch the daily rate limit; split across days if needed).
+- [x] Unity: run **HabitatVLM → Setup Interactables and Robot** once (adds SceneReset + TaskRunner), save the scene.
+- [~] Full suite on **B** done (v2, v3); on **C** (Gemini) still to do (watch the daily rate limit; split across days if needed).
 - [x] Kaggle suite, prompt v2 (12 Nov): **22/24** (Easy 8/8, Medium 8/8, Hard 6/8), 4.7 s/step, 0 invalid. Failures: T08 wrong cabinet (left/right), T21 walked away holding an item (step limit). Waste: T16 6 extra move_to after done. Unity paused when unfocused → `Application.runInBackground = true` in AgentLoop.
 - [x] Prompt v3 (task parts checked as done/not done, one item at a time, "holding + near destination = place now", match task words to names, warnings for 3x repeats and move_to-only wandering). `episodes.csv` now logs `prompt`; analyze.py compares versions (`--tier hard`).
 - [x] Kaggle suite, prompt v3 (12 Nov): **20/24** (Easy 7/8, Medium 8/8 with fewer wasted steps, Hard 5/8). T21 fixed; T12 regressed (exact-name rule rejected "purple cabinet"); T22/T23 failed on place-from-afar loops.
 - [x] Prompt v3.1: colour/position descriptions allowed again (resolve via image + item locations, reply with exact name).
 - [ ] Optional v4: auto-approach in pick/place/open/close (decision pending).
-- [ ] Re-run the Hard tier with v3 on Kaggle → compare with v2 (ablation for the report). If v3 is not worse, re-run Easy/Medium too.
+- [x] ~~Re-run Hard tier with v3~~ → full suite was run with v3 instead (20/24, above).
+- [ ] Re-run the full suite with the current prompt (v3.2) → final Kaggle numbers.
 - [ ] Review the failures: categorise them (wrong object, wrong order, navigation, invalid JSON) and note 3 lessons.
 - [ ] Record a 2–3 minute demo video (OBS Studio): split view of the robot camera, the scene, and the bridge log.
 - [ ] Write `README.md`: what it is, architecture diagram, setup steps, how to switch backends, results, limitations.
@@ -145,21 +146,25 @@ Scope (9 Nov): Kaggle (B) + Gemini (C) only; no local model, no Groq.
 - [x] Point+Say: click "this" (and "there"), type "put this there"; names are added to the command for the VLM.
 - [x] Keyboard debug keys only in Tasks mode; its help box hidden by default (H).
 - [x] Locations (12 Nov, after user test): `home_base` at the robot's start ("return to base" failed: no such object), `marked_spot` from floor clicks in Point+Say ("this"/"there" could only be objects). Validator + prompt v3.2. "Will send" preview in Point+Say.
-- [ ] User test in Unity: each mode once (see checklist in chat 12 Nov). Record a short clip of each for the demo video.
+- [x] User test in Unity (12 Nov): Point+Say toolbox → marked_spot OK (5 steps), Text "blue canister in left cabinet" OK (7 steps); click fix for the invisible front wall. Still to try: return-to-base, Click mode near the table.
+- [ ] Record a short clip of each mode for the demo video.
 
 ---
 
 ## Phase 9 — Any room: generalisation + 5 new test rooms (added 9 Nov)
 
 Goal (SPEC §5.6, option A): the same code works in any room built from the supported object types; only the scene changes.
-- [ ] Room layout files `rooms/room_XX.json` (room size, objects: name, kind, primitive, position, rotation, size, colour, door direction) + a general **HabitatVLM → Build Room from Layout** editor tool. Rebuild the current room as `room_01` and confirm nothing changed.
-- [ ] Objects describe themselves: `HabitatSetup` scans the scene for `Interactable`s instead of a fixed name list; remove `object_kinds` from `bridge/config.yaml` (Unity sends kinds).
-- [ ] NavMesh rebuilt automatically at Play (`NavMeshSurface.BuildNavMesh`), so moved furniture needs no manual bake.
-- [ ] Skills handle rotated furniture (object's own axes) and free-standing cabinets (door direction from the container).
+- [x] Layout files `Assets/Rooms/room_XX.json` (room size, colours, robot start, objects: name, type surface/container/item/obstacle, pos, size, colour, door facing, item host) + **HabitatVLM → Build Rooms from Layouts** (`RoomBuilder.cs`): one scene per room in `Assets/Scenes/Rooms/`, NavMesh baked and saved, AgentManager wired with the room's task file. Room 01 kept as is (not rebuilt).
+- [x] Objects describe themselves: `HabitatSetup` scans the scene for `Interactable`s (room-01 name table only as a fallback); Unity sends kinds, so `config.yaml object_kinds` is no longer needed for new rooms.
+- [x] NavMesh baked by the room builder (rebuild the room after editing its layout).
+- [x] Cabinets on any wall: `facing` in the layout; the robot always approaches a container from its door side.
 - [ ] Generic keyboard debug (pick any object from a list) instead of fixed keys.
-- [ ] Build **5 new rooms** (`room_02` … `room_06`, space-habitat themes: storage bay, lab, galley, crew cabin, airlock), each with its own scene and `Assets/Tasks/tasks_room0X.json`.
-- [ ] Keyboard check in each new room, then the agent on 2–3 tasks per room (Kaggle).
-- [ ] Add per-room success rates to the results table (`eval/analyze.py`).
+- [x] 3 new rooms (12 Nov; scope cut from 5 to 3 by the user): `room_02` storage bay (B01–B09), `room_03` science lab (L01–L09), `room_04` galley (G01–G09); 9 tasks each (3/3/3), incl. colour references and items starting inside closed cabinets. Layout check script passed.
+- [x] 2 rooms from the user's reference photos (12 Nov): `room_05` study corner (Img 1: desk, plant, pencil cup, books, lamp, big box, laundry basket; S01–S09) and `room_06` bedroom (Img 2: bed + pillows, nightstand, dresser, storage tub with lid, wicker basket, moving boxes, suitcase; R01–R09). Stylised from primitives. RoomBuilder gained styles (table, bed, tub with a hinged lid, open-top basket), decor (window, picture, door, lamp with light, plant, books; no colliders, not interactable), composite items (plant, books) and per-room light colour.
+- [ ] Rebuild all rooms (HabitatVLM → Build Rooms from Layouts) and run each room's 9 tasks.
+- [x] First test of rooms 05/06 (12 Nov): R01 OK, Point moves OK. Fixes: prompt v3.4 (furniture can't be carried; impossible tasks -> done with "CANNOT:" and logged as not done; pointed furniture labelled in the Point note); move_to only picks stand points with a complete path and snaps the robot back onto the NavMesh (was "no path to wicker_basket" after standing at a wall).
+- [ ] User: Build Rooms from Layouts in Unity → open each room → Click mode check → suite per room on Kaggle.
+- [x] Per-room success rates in `eval/analyze.py` (Room column + Per room table).
 
 **Checkpoint 9:** The unchanged code completes tasks in at least 4 of the 6 rooms; results reported per room.
 
