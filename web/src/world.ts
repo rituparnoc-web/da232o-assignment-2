@@ -180,7 +180,7 @@ export class HabitatWorld {
 
     this.addZone("STORAGE", -3.4, -2.8, 5.2, 3.2, "#24504e");
     this.addZone("DELIVERY", 4.45, -2.8, 3.0, 3.2, "#3e5040");
-    this.addZone("ROOM 2 / DELIVERY", 11.2, -2.8, 4.0, 3.2, "#3e5040");
+    this.addZone("ROOM 2 / DELIVERY", 11.2, 2.8, 4.0, 3.2, "#3e5040");
     this.addBench();
     this.addWallMarkings();
   }
@@ -271,7 +271,7 @@ export class HabitatWorld {
     this.addContainer("object_02", "Red tote", "#e46855", "RED / CONTAINER", -2.75, -2.75);
     this.addContainer("object_03", "Yellow tote", "#e5bf49", "YELLOW / CONTAINER", -1.05, -2.75);
     this.addPlatform("delivery_01", 4.55, -2.75);
-    this.addPlatform("delivery_02", 11.2, -2.75);
+    this.addPlatform("delivery_02", 11.2, 2.75);
   }
 
   private addContainer(id: string, label: string, color: string, detail: string, x: number, z: number): void {
