@@ -176,6 +176,18 @@ export class HabitatWorld {
     doorPanel.position.set(0, 1.2, 1.5);
     this.door.position.set(7.15, 0, -1.5);
     this.door.add(doorPanel);
+    const doorInsetMaterial = new THREE.MeshStandardMaterial({ color: "#314d4d", roughness: 0.62, metalness: 0.3 });
+    for (const x of [-0.13, 0.13]) {
+      const inset = new THREE.Mesh(new THREE.BoxGeometry(0.02, 1.65, 1.85), doorInsetMaterial);
+      inset.position.set(x, 1.25, 1.5);
+      this.door.add(inset);
+      const handle = new THREE.Mesh(
+        new THREE.BoxGeometry(0.07, 0.35, 0.06),
+        new THREE.MeshStandardMaterial({ color: "#d2dfb8", metalness: 0.65, roughness: 0.35 }),
+      );
+      handle.position.set(x, 1.1, 2.65);
+      this.door.add(handle);
+    }
     this.scene.add(this.door);
 
     this.addZone("STORAGE", -3.4, -2.8, 5.2, 3.2, "#24504e");
@@ -183,6 +195,74 @@ export class HabitatWorld {
     this.addZone("ROOM 2 / DELIVERY", 11.2, 2.8, 4.0, 3.2, "#3e5040");
     this.addBench();
     this.addWallMarkings();
+    this.addRoomDetails();
+    this.addWallStorage(5.1);
+    this.addWallStorage(10.85);
+  }
+
+  private addWallStorage(x: number): void {
+    const storage = new THREE.Group();
+    const frameMaterial = new THREE.MeshStandardMaterial({ color: "#879e91", metalness: 0.55, roughness: 0.48 });
+    const back = shadow(new THREE.Mesh(
+      new THREE.BoxGeometry(1.3, 1.25, 0.12),
+      new THREE.MeshStandardMaterial({ color: "#334e4e", roughness: 0.75 }),
+    ));
+    back.position.y = 1.3;
+    storage.add(back);
+    for (const height of [0.78, 1.38, 1.92]) {
+      const shelf = shadow(new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.08, 0.34), frameMaterial));
+      shelf.position.set(0, height, 0.13);
+      storage.add(shelf);
+    }
+    for (const [offset, height, color] of [
+      [-0.38, 1.57, "#d8c780"], [0, 1.57, "#88bbb2"], [0.37, 1.57, "#d5a28b"],
+      [-0.3, 0.97, "#9cb6ad"], [0.25, 0.97, "#c2d5a6"],
+    ] as const) {
+      const canister = shadow(new THREE.Mesh(
+        new THREE.CylinderGeometry(0.12, 0.12, 0.3, 16),
+        new THREE.MeshStandardMaterial({ color, roughness: 0.45, metalness: 0.25 }),
+      ));
+      canister.position.set(offset, height, 0.13);
+      storage.add(canister);
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.04, 16), frameMaterial);
+      cap.position.set(offset, height + 0.17, 0.13);
+      storage.add(cap);
+    }
+    storage.position.set(x, 0, -5.16);
+    this.scene.add(storage);
+  }
+
+  private addRoomDetails(): void {
+    const frameMaterial = new THREE.MeshStandardMaterial({ color: "#536d68", metalness: 0.38, roughness: 0.62 });
+    const panelMaterial = new THREE.MeshStandardMaterial({ color: "#1c3437", metalness: 0.2, roughness: 0.7 });
+    const lightMaterial = new THREE.MeshStandardMaterial({ color: "#c6e7c1", emissive: "#76c9a8", emissiveIntensity: 0.75 });
+    for (const x of [-1.6, 2.5, 9.2, 12.5]) {
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(1.45, 1.05, 0.12), frameMaterial);
+      frame.position.set(x, 1.25, -5.15);
+      this.scene.add(frame);
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.85, 0.04), panelMaterial);
+      panel.position.set(x, 1.25, -5.06);
+      this.scene.add(panel);
+      for (let index = 0; index < 3; index += 1) {
+        const vent = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.035, 0.025), frameMaterial);
+        vent.position.set(x - 0.14, 1.02 + index * 0.14, -5.025);
+        this.scene.add(vent);
+      }
+      const indicator = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.03), lightMaterial);
+      indicator.position.set(x + 0.48, 1.48, -5.02);
+      this.scene.add(indicator);
+    }
+    for (const x of [-6.9, 0, 6.8, 8.3, 14.1]) {
+      const rib = new THREE.Mesh(new THREE.BoxGeometry(0.09, 2.45, 0.12), frameMaterial);
+      rib.position.set(x, 1.25, -5.13);
+      this.scene.add(rib);
+    }
+    const thresholdMaterial = new THREE.MeshStandardMaterial({ color: "#d9b866", roughness: 0.82 });
+    for (const z of [-1.2, -0.8, -0.4, 0, 0.4, 0.8, 1.2]) {
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.018, 0.1), thresholdMaterial);
+      stripe.position.set(7.15, 0.03, z);
+      this.scene.add(stripe);
+    }
   }
 
   private addZone(label: string, x: number, z: number, width: number, depth: number, color: string): void {
@@ -219,6 +299,48 @@ export class HabitatWorld {
     ));
     top.position.y = 0.95;
     bench.add(top);
+    const edgingMaterial = new THREE.MeshStandardMaterial({ color: "#9bafa2", roughness: 0.5, metalness: 0.5 });
+    for (const z of [-0.84, 0.84]) {
+      const edge = new THREE.Mesh(new THREE.BoxGeometry(2.65, 0.045, 0.045), edgingMaterial);
+      edge.position.set(0, 1.13, z);
+      bench.add(edge);
+    }
+    const consoleBase = shadow(new THREE.Mesh(
+      new THREE.BoxGeometry(0.75, 0.09, 0.48),
+      new THREE.MeshStandardMaterial({ color: "#718e85", roughness: 0.55, metalness: 0.35 }),
+    ));
+    consoleBase.position.set(-0.75, 1.165, -0.1);
+    bench.add(consoleBase);
+    const screen = shadow(new THREE.Mesh(
+      new THREE.BoxGeometry(0.66, 0.43, 0.07),
+      new THREE.MeshStandardMaterial({ color: "#18383b", roughness: 0.4, metalness: 0.25 }),
+    ));
+    screen.position.set(-0.75, 1.42, -0.28);
+    bench.add(screen);
+    const display = new THREE.Mesh(
+      new THREE.BoxGeometry(0.54, 0.31, 0.015),
+      new THREE.MeshStandardMaterial({ color: "#7cbeb3", emissive: "#285f5a", emissiveIntensity: 0.55 }),
+    );
+    display.position.set(-0.75, 1.43, -0.237);
+    bench.add(display);
+    const sample = shadow(new THREE.Mesh(
+      new THREE.CylinderGeometry(0.15, 0.18, 0.37, 20),
+      new THREE.MeshStandardMaterial({ color: "#c5d8b8", roughness: 0.42, metalness: 0.3 }),
+    ));
+    sample.position.set(0.08, 1.305, -0.22);
+    bench.add(sample);
+    const sampleCap = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.06, 20), edgingMaterial);
+    sampleCap.position.set(0.08, 1.52, -0.22);
+    bench.add(sampleCap);
+    const toolCase = shadow(new THREE.Mesh(
+      new THREE.BoxGeometry(0.62, 0.22, 0.4),
+      new THREE.MeshStandardMaterial({ color: "#d4976d", roughness: 0.65, metalness: 0.12 }),
+    ));
+    toolCase.position.set(0.75, 1.23, 0.18);
+    bench.add(toolCase);
+    const latch = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.06, 0.025), edgingMaterial);
+    latch.position.set(0.75, 1.24, 0.39);
+    bench.add(latch);
     for (const x of [-1.1, 1.1]) {
       for (const z of [-0.62, 0.62]) {
         const leg = shadow(new THREE.Mesh(
@@ -328,6 +450,18 @@ export class HabitatWorld {
       post.position.set(px, 0.58, pz);
       root.add(post);
     }
+    const trimMaterial = new THREE.MeshStandardMaterial({ color: "#d2dfb3", emissive: "#728b42", emissiveIntensity: 0.4 });
+    for (const px of [-0.7, 0.7]) {
+      const trim = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.015, 1.05), trimMaterial);
+      trim.position.set(px, 0.478, 0);
+      root.add(trim);
+    }
+    const lampMaterial = new THREE.MeshStandardMaterial({ color: "#d1f6b3", emissive: "#82c949", emissiveIntensity: 0.85 });
+    for (const px of [-0.68, 0.68]) {
+      const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.09, 0.025), lampMaterial);
+      lamp.position.set(px, 0.24, 0.82);
+      root.add(lamp);
+    }
     const label = makeLabel(id, "DELIVERY / PLATFORM");
     label.position.set(0, 1.34, 0.12);
     root.add(label);
@@ -360,12 +494,17 @@ export class HabitatWorld {
 
   private buildRobot(): void {
     const wheelMaterial = new THREE.MeshStandardMaterial({ color: "#111e20", roughness: 0.76, metalness: 0.2 });
+    const hubMaterial = new THREE.MeshStandardMaterial({ color: "#b3c5b5", roughness: 0.42, metalness: 0.7 });
     for (const x of [-0.54, 0.54]) {
       for (const z of [-0.32, 0.32]) {
         const wheel = shadow(new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.17, 24), wheelMaterial));
         wheel.rotation.z = Math.PI / 2;
         wheel.position.set(x, 0.3, z);
         this.robot.add(wheel);
+        const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.03, 20), hubMaterial);
+        hub.rotation.z = Math.PI / 2;
+        hub.position.set(x + Math.sign(x) * 0.09, 0.3, z);
+        this.robot.add(hub);
       }
     }
     const chassis = shadow(new THREE.Mesh(
@@ -374,12 +513,32 @@ export class HabitatWorld {
     ));
     chassis.position.y = 0.72;
     this.robot.add(chassis);
+    const bumper = shadow(new THREE.Mesh(
+      new THREE.BoxGeometry(1.02, 0.13, 0.08),
+      new THREE.MeshStandardMaterial({ color: "#c7d7c6", metalness: 0.55, roughness: 0.4 }),
+    ));
+    bumper.position.set(0, 0.55, 0.49);
+    this.robot.add(bumper);
+    const headlightMaterial = new THREE.MeshStandardMaterial({ color: "#f6e8aa", emissive: "#e4b85e", emissiveIntensity: 0.8 });
+    for (const x of [-0.38, 0.38]) {
+      const headlight = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.09, 0.025), headlightMaterial);
+      headlight.position.set(x, 0.79, 0.48);
+      this.robot.add(headlight);
+    }
     const top = shadow(new THREE.Mesh(
       new THREE.BoxGeometry(0.83, 0.2, 0.65),
       new THREE.MeshStandardMaterial({ color: "#d9dfc5", roughness: 0.38, metalness: 0.22 }),
     ));
     top.position.set(0, 1.07, -0.03);
     this.robot.add(top);
+    for (const x of [-0.23, -0.12, -0.01]) {
+      const vent = new THREE.Mesh(
+        new THREE.BoxGeometry(0.055, 0.012, 0.2),
+        new THREE.MeshStandardMaterial({ color: "#637e74", roughness: 0.65 }),
+      );
+      vent.position.set(x, 1.175, -0.18);
+      this.robot.add(vent);
+    }
     const head = shadow(new THREE.Mesh(
       new THREE.CylinderGeometry(0.27, 0.34, 0.31, 24),
       new THREE.MeshStandardMaterial({ color: "#f2eee0", roughness: 0.32, metalness: 0.25 }),
