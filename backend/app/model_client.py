@@ -9,6 +9,7 @@ import httpx
 from pydantic import TypeAdapter, ValidationError
 
 from app.schemas import ActionProposal, StepRequest
+from app.event_log import log_event
 from app.settings import Settings
 
 ACTION_ADAPTER = TypeAdapter(ActionProposal)
@@ -126,14 +127,28 @@ class OllamaModelClient:
             ],
         }
 
+        log_event(
+            "model.request", observation=request, model=self._settings.model_name,
+            endpoint="/api/chat", prompt=prompt_data, system_prompt=SYSTEM_PROMPT,
+            image_media_type=request.image_media_type, image_base64_chars=len(request.image_base64),
+            temperature=0, stream=False,
+        )
         try:
             response = await self._client.post("/api/chat", json=payload)
             response.raise_for_status()
             content = response.json()["message"]["content"]
+            log_event(
+                "model.response", observation=request, model=self._settings.model_name,
+                http_status=response.status_code,
+                content=content[:2000] if isinstance(content, str) else None,
+                truncated=isinstance(content, str) and len(content) > 2000,
+            )
             proposal = ACTION_ADAPTER.validate_json(content)
         except httpx.TimeoutException as error:
+            log_event("model.failed", observation=request, code="inference_timeout")
             raise ModelError("inference_timeout", "Vision model inference timed out") from error
         except httpx.HTTPError as error:
+            log_event("model.failed", observation=request, code="model_unavailable", error_type=type(error).__name__)
             raise ModelError("model_unavailable", "Vision model service is unavailable") from error
         except (KeyError, TypeError, ValueError, ValidationError) as error:
             details = (
@@ -145,9 +160,11 @@ class OllamaModelClient:
                 else type(error).__name__
             )
             logger.warning("Invalid Ollama model response: %s", details)
+            log_event("model.failed", observation=request, code="invalid_model_output", validation=details)
             raise ModelError("invalid_model_output", "Vision model returned an invalid action") from error
 
         inference_ms = round((time.perf_counter() - started) * 1000)
+        log_event("model.validated", observation=request, proposal=proposal.model_dump(), inference_ms=inference_ms)
         return proposal, inference_ms
 
     async def aclose(self) -> None:

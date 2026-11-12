@@ -1,4 +1,4 @@
-import { checkApi, requestAction, type ActionResult, type StepResponse } from "./api";
+import { checkApi, logClientEvent, requestAction, type ActionResult, type LogContext, type StepResponse } from "./api";
 import { HabitatWorld, type ExecutionResult, type TableSide } from "./world";
 import "./style.css";
 
@@ -25,7 +25,7 @@ let previousActionResult: ActionResult | null = null;
 let currentAbort: AbortController | null = null;
 let activeRun = 0;
 let running = false;
-let currentStep = 0;
+let liveContext: LogContext = {};
 let lastFailureSignature: string | null = null;
 let repeatedFailureCount = 0;
 
@@ -37,7 +37,8 @@ const targetDetails = [
   { id: "delivery_02", name: "Room 2 platform", detail: "Transfer zone / bay B", color: "#a5cf74" },
 ];
 
-function logEvent(message: string, kind = "normal"): void {
+function logEvent(message: string, kind = "normal", context: LogContext = liveContext): void {
+  logClientEvent("ui.message", { message, kind }, context);
   const time = new Date().toLocaleTimeString([], { minute: "2-digit", second: "2-digit" });
   const row = document.createElement("div");
   row.className = `log-entry ${kind}`;
@@ -127,6 +128,14 @@ function toActionResult(actionId: string, result: ExecutionResult): ActionResult
   };
 }
 
+function logExecutionResult(result: ExecutionResult, context: LogContext): void {
+  logClientEvent("rover.action_result", {
+    status: result.status, target_id: result.target_id ?? null,
+    error_code: result.error_code ?? null, message: result.message,
+    held_object_id: world.getHeldObjectId(), ...world.getAgentCoordinates(),
+  }, context);
+}
+
 function expectedTargetFor(text: string): string {
   const normalized = text.toLowerCase();
   const explicitId = normalized.match(/\bobject_0[123]\b/)?.[0];
@@ -143,10 +152,13 @@ function expectedPlatformFor(text: string): string {
 
 async function doManualAction(action: { action: "navigate_to" | "pick_up" | "place_on"; target_id: string }): Promise<void> {
   if (running) return;
+  const context = { action_id: crypto.randomUUID() };
+  logClientEvent("manual.action", { action: action.action, target_id: action.target_id }, context);
   setSceneStatus(action.action, true);
-  const result = await world.execute(action);
+  const result = await world.execute(action, context);
+  logExecutionResult(result, context);
   syncWorldReadout();
-  logEvent(result.message, result.status === "failed" ? "is-error" : "is-success");
+  logEvent(result.message, result.status === "failed" ? "is-error" : "is-success", context);
   setSceneStatus(result.status === "succeeded" ? "standby" : result.error_code ?? "standby");
 }
 
@@ -159,25 +171,32 @@ async function runMission(): Promise<void> {
   const expectedPlatformId = expectedPlatformFor(taskText);
   const heldObjectId = world.getHeldObjectId();
   if (heldObjectId && heldObjectId !== expectedTargetId) {
+    logClientEvent("mission.rejected", { instruction: taskText, held_object_id: heldObjectId, expected_target_id: expectedTargetId });
     logEvent(`Cannot deliver ${expectedTargetId} while carrying ${heldObjectId}.`, "is-error");
     setSceneStatus("wrong container");
     return;
   }
   running = true;
-  currentStep = 0;
+  let currentStep = 0;
   previousActionResult = null;
   lastFailureSignature = null;
   repeatedFailureCount = 0;
   activeRun += 1;
   const thisRun = activeRun;
   const sessionId = crypto.randomUUID();
+  const missionContext = { session_id: sessionId };
+  liveContext = missionContext;
+  logClientEvent("mission.started", {
+    instruction: taskText, expected_target_id: expectedTargetId,
+    platform_id: expectedPlatformId, table_side: tableSide ?? null,
+  }, missionContext);
   currentAbort = new AbortController();
   setRunButtonBusy(true);
   stopButton.disabled = false;
   instruction.disabled = true;
   byId("last-decision").textContent = "PENDING";
   setSceneStatus("capturing", true);
-  logEvent("Mission opened. Capturing current habitat view.");
+  logEvent("Mission opened. Capturing current habitat view.", "normal", missionContext);
 
   try {
     for (let observationId = 0; observationId < 12; observationId += 1) {
@@ -186,6 +205,8 @@ async function runMission(): Promise<void> {
       stepCount.textContent = String(currentStep).padStart(2, "0");
       setSceneStatus(observationId === 0 ? "vision request" : "next decision", true);
       const requestId = crypto.randomUUID();
+      const requestContext = { ...missionContext, request_id: requestId, observation_id: observationId };
+      liveContext = requestContext;
       const requestStartedAt = Date.now();
       const requestTimer = window.setInterval(() => {
         const elapsedSeconds = Math.floor((Date.now() - requestStartedAt) / 1000);
@@ -209,11 +230,14 @@ async function runMission(): Promise<void> {
       }
 
       if (response.session_id !== sessionId || response.request_id !== requestId || response.observation_id !== observationId) {
+        logClientEvent("decision.stale", { message: "Rejected mismatched response identifiers." }, requestContext);
         throw new Error("Rejected stale or mismatched model response.");
       }
       if (thisRun !== activeRun) break;
 
-      const proposal = response.proposal;
+      const context = { ...requestContext, action_id: response.action_id };
+      liveContext = context;
+      const proposal = { ...response.proposal };
       if (!world.getHeldObjectId() && (proposal.action === "navigate_to" || proposal.action === "pick_up")) {
         proposal.target_id = expectedTargetId;
       }
@@ -221,13 +245,18 @@ async function runMission(): Promise<void> {
         proposal.target_id = expectedPlatformId;
       }
       const decision = { ...response, proposal };
+      logClientEvent("decision.applied", {
+        raw_action: response.proposal.action, raw_target_id: response.proposal.target_id ?? null,
+        action: proposal.action, target_id: proposal.target_id ?? null,
+        target_overridden: response.proposal.target_id !== proposal.target_id,
+      }, context);
 
-      logEvent(`Qwen ${decision.inference_ms} ms / ${formatAction(decision)}`, "is-model");
+      logEvent(`Qwen ${decision.inference_ms} ms / ${formatAction(decision)}`, "is-model", context);
       byId("last-decision").textContent = formatAction(decision).toUpperCase();
       if (decision.proposal.action === "finish") {
         if (world.isDelivered(expectedTargetId, expectedPlatformId)) {
           setSceneStatus("verified", true);
-          logEvent(`Task verified: ${expectedTargetId} is on ${expectedPlatformId}.`, "is-success");
+          logEvent(`Task verified: ${expectedTargetId} is on ${expectedPlatformId}.`, "is-success", context);
           break;
         }
         previousActionResult = toActionResult(decision.action_id, {
@@ -235,48 +264,55 @@ async function runMission(): Promise<void> {
           error_code: "premature_finish",
           message: "Task objective is not complete.",
         });
-        logEvent("Finish rejected: the requested container has not been delivered.", "is-error");
+        logClientEvent("mission.finish_rejected", { expected_target_id: expectedTargetId, platform_id: expectedPlatformId }, context);
+        logEvent("Finish rejected: the requested container has not been delivered.", "is-error", context);
         continue;
       }
       if (decision.proposal.action === "stop") {
         world.stopMovement();
         previousActionResult = toActionResult(decision.action_id, { status: "cancelled", message: "Stopped by model proposal." });
-        logEvent("The model proposed stop; task ended.", "is-error");
+        logClientEvent("mission.model_stop", {}, context);
+        logEvent("The model proposed stop; task ended.", "is-error", context);
         break;
       }
 
       if (decision.proposal.action === "pick_up" || (world.getHeldObjectId()
           && (decision.proposal.action === "navigate_to" || decision.proposal.action === "place_on"))) {
         const targetId = world.getHeldObjectId() ?? decision.proposal.target_id ?? "";
+        logClientEvent("rover.action_started", { action: "pick_and_place", target_id: targetId, platform_id: expectedPlatformId }, context);
         const result = await world.executePickAndPlace(targetId, (phase) => {
           setSceneStatus(phase, true);
-          logEvent(phase, "is-model");
-        }, tableSide, expectedPlatformId);
+          logClientEvent("rover.phase", { phase }, context);
+          logEvent(phase, "is-model", context);
+        }, tableSide, expectedPlatformId, context);
+        logExecutionResult(result, context);
         if (thisRun !== activeRun) break;
         previousActionResult = toActionResult(decision.action_id, result);
         syncWorldReadout();
-        logEvent(result.message, result.status === "failed" ? "is-error" : "is-success");
+        logEvent(result.message, result.status === "failed" ? "is-error" : "is-success", context);
         if (result.status === "succeeded" && world.isDelivered(expectedTargetId, expectedPlatformId)) {
           setSceneStatus("verified", true);
-          logEvent(`Task verified: ${expectedTargetId} is on ${expectedPlatformId}.`, "is-success");
+          logEvent(`Task verified: ${expectedTargetId} is on ${expectedPlatformId}.`, "is-success", context);
           break;
         }
         if (result.status !== "succeeded") break;
-        logEvent(`Wrong object delivered; expected ${expectedTargetId}.`, "is-error");
+        logEvent(`Wrong object delivered; expected ${expectedTargetId}.`, "is-error", context);
         break;
       }
 
       setSceneStatus(decision.proposal.action, true);
-      const result = await world.execute(decision.proposal);
+      logClientEvent("rover.action_started", { action: proposal.action, target_id: proposal.target_id ?? null }, context);
+      const result = await world.execute(decision.proposal, context);
+      logExecutionResult(result, context);
       previousActionResult = toActionResult(decision.action_id, result);
       syncWorldReadout();
-      logEvent(result.message, result.status === "failed" ? "is-error" : "is-success");
+      logEvent(result.message, result.status === "failed" ? "is-error" : "is-success", context);
       if (result.status === "failed" && result.error_code) {
         const failureSignature = `${decision.proposal.action}:${decision.proposal.target_id ?? ""}:${result.error_code}`;
         repeatedFailureCount = failureSignature === lastFailureSignature ? repeatedFailureCount + 1 : 1;
         lastFailureSignature = failureSignature;
         if (repeatedFailureCount >= 2) {
-          logEvent(`Repeated ${result.error_code}; mission stopped to prevent an action loop.`, "is-error");
+          logEvent(`Repeated ${result.error_code}; mission stopped to prevent an action loop.`, "is-error", context);
           break;
         }
       } else {
@@ -287,10 +323,14 @@ async function runMission(): Promise<void> {
     }
   } catch (error) {
     if (!(error instanceof DOMException && error.name === "AbortError")) {
-      logEvent(error instanceof Error ? error.message : "Mission failed.", "is-error");
+      logEvent(error instanceof Error ? error.message : "Mission failed.", "is-error", missionContext);
       setSceneStatus("link error");
     }
   } finally {
+    logClientEvent("mission.ended", {
+      observations: currentStep, superseded: thisRun !== activeRun,
+      verified: thisRun === activeRun && world.isDelivered(expectedTargetId, expectedPlatformId),
+    }, missionContext);
     if (thisRun === activeRun) {
       running = false;
       currentAbort = null;
@@ -299,12 +339,14 @@ async function runMission(): Promise<void> {
       instruction.disabled = false;
       syncWorldReadout();
       if (sceneState.textContent !== "VERIFIED" && sceneState.textContent !== "LINK ERROR") setSceneStatus("standby");
+      liveContext = {};
     }
   }
 }
 
 function stopMission(): void {
   if (!running) return;
+  logClientEvent("mission.cancelled", { held_object_id: world.getHeldObjectId(), ...world.getAgentCoordinates() }, liveContext);
   activeRun += 1;
   currentAbort?.abort();
   currentAbort = null;
@@ -315,6 +357,7 @@ function stopMission(): void {
   instruction.disabled = false;
   setSceneStatus("cancelled");
   logEvent("Local stop issued. Late decisions will be ignored.", "is-error");
+  liveContext = {};
 }
 
 function bindManualControls(): void {
@@ -334,10 +377,13 @@ function bindManualControls(): void {
   for (const [id, dx, dz] of movement) {
     byId(id).addEventListener("click", async () => {
       if (running) return;
+      const context = { action_id: crypto.randomUUID() };
+      logClientEvent("manual.nudge", { dx, dz }, context);
       setSceneStatus("manual move", true);
-      const result = await world.nudge(dx, dz);
+      const result = await world.nudge(dx, dz, context);
+      logExecutionResult(result, context);
       syncWorldReadout();
-      if (result.status === "failed") logEvent(result.message, "is-error");
+      if (result.status === "failed") logEvent(result.message, "is-error", context);
       setSceneStatus("standby");
     });
   }

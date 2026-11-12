@@ -1,0 +1,884 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#152e32">
+  <meta name="description" content="An implementation-grounded interview field guide to the Habitat VLM-controlled rover project.">
+  <title>Habitat / Interview field guide</title>
+  <style>
+    :root{color-scheme:light;--ink:#193236;--muted:#536867;--paper:#f5f5ee;--card:#fffef9;--line:#d6ded4;--green:#d2f368;--teal:#17665e;--dark:#152e32;--orange:#99502c;--radius:15px}
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth;scroll-padding-top:95px}
+    body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.65 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    button,input{font:inherit}
+    button,a,input,summary{-webkit-tap-highlight-color:transparent}
+    button,a,summary{touch-action:manipulation}
+    a{color:var(--teal);text-underline-offset:3px}
+    button{cursor:pointer}
+    button:focus-visible,a:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid #337cce;outline-offset:4px}
+    [hidden]{display:none!important}
+    .skip{position:fixed;top:-80px;left:15px;z-index:20;background:white;padding:10px}
+    .skip:focus{top:12px}
+    .topbar{position:sticky;top:0;z-index:10;min-height:75px;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:14px 30px;background:var(--dark);color:#f3f5ec;border-bottom:1px solid #395155}
+    .brand{display:flex;gap:12px;align-items:center;color:inherit;text-decoration:none}
+    .brand-mark{display:grid;place-items:center;width:37px;height:37px;border:1px solid #839e7c;border-radius:10px;color:var(--green);font:700 23px/1 monospace}
+    .brand strong{display:block;font-size:15px;letter-spacing:.13em;line-height:1.4}
+    .brand small{color:#b4c6be;font:10px/1.5 ui-monospace,monospace;letter-spacing:.09em}
+    .tools{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+    .button{border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);padding:8px 13px;font-size:13px;font-weight:650;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+    .topbar .button{background:transparent;color:#f3f5ec;border-color:#587070}
+    .button.primary,.topbar .button[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:var(--dark)}
+    .button:hover{border-color:var(--teal);filter:brightness(.97)}
+    .layout{display:grid;grid-template-columns:270px minmax(0,1fr);max-width:1560px;margin:auto}
+    .sidebar{position:sticky;top:76px;height:calc(100vh - 76px);overflow-y:auto;padding:28px 20px 30px 26px;border-right:1px solid var(--line)}
+    .eyebrow{font:650 11px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.13em;text-transform:uppercase}
+    .sidebar label{display:block;margin-bottom:8px;color:var(--muted)}
+    .search-wrap{position:relative}
+    #search{width:100%;border:1px solid #bac9bd;border-radius:9px;padding:10px 32px 10px 11px;background:var(--card);color:var(--ink);font-size:13px}
+    .search-key{position:absolute;right:11px;top:10px;color:#7a8a82;font:14px monospace}
+    #search-status{font-size:11px;color:var(--muted);margin:8px 0 18px;min-height:18px}
+    .nav-group{margin:20px 0 8px;color:var(--muted)}
+    .topic-link{display:flex;gap:11px;align-items:center;text-decoration:none;color:var(--ink);font-size:13px;line-height:1.45;padding:10px 11px;margin:3px 0;border-radius:8px;border:1px solid transparent}
+    .topic-link .num{font:11px ui-monospace,monospace;color:#718177;min-width:19px}
+    .topic-link:hover{background:#e8ede2}
+    .topic-link[aria-current="page"]{background:#e5edcf;border-color:#cadb9c;font-weight:700}
+    .topic-link[aria-current="page"] .num{color:var(--teal)}
+    .sidebar-foot{border-top:1px solid var(--line);margin-top:24px;padding-top:16px;font-size:11px;color:var(--muted)}
+    .sidebar-foot strong{color:var(--ink);display:block;margin-bottom:5px}
+    main{min-width:0;padding:38px 46px 50px;max-width:1240px}
+    .breadcrumb{display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--muted);margin-bottom:20px}
+    .reading-meta{font-size:12px}
+    h1,h2,h3,p{margin-top:0}
+    h1{font-size:clamp(30px,3.8vw,50px);line-height:1.12;letter-spacing:-.045em;max-width:920px;margin-bottom:18px;font-weight:750}
+    h2{font-size:24px;line-height:1.3;letter-spacing:-.025em}
+    h3{font-size:16px;line-height:1.4;margin-bottom:8px}
+    .lede{font-size:18px;color:var(--muted);max-width:850px;line-height:1.65;margin-bottom:22px}
+    .chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:28px}
+    .chip{font:11px/1.4 ui-monospace,monospace;border:1px solid var(--line);border-radius:50px;padding:5px 9px;background:#edf0e7}
+    .section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:34px 0 15px}
+    .section-heading h2{margin:0}
+    .section-heading .eyebrow{color:var(--muted)}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:23px}
+    .cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+    .card p:last-child{margin-bottom:0}
+    .card p{font-size:14px;color:var(--muted)}
+    .card .eyebrow{color:var(--teal);display:block;margin-bottom:9px}
+    .callout{border-left:4px solid var(--teal);background:#e6eee5;padding:18px 22px;margin:20px 0;border-radius:0 10px 10px 0;font-size:14px}
+    .callout.warning{border-color:#b57443;background:#f4eadc}
+    .callout strong{display:block;margin-bottom:4px}
+    .callout p{margin:0}
+    .architecture{background:var(--dark);color:#f0f3e9;border-radius:18px;padding:26px;margin:24px 0}
+    .architecture h2{margin-bottom:5px}
+    .architecture>p{font-size:13px;color:#b9ccc2;margin-bottom:22px}
+    .lane-label{color:var(--green);margin:21px 0 10px}
+    .diagram-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .diagram-node{position:relative;text-align:left;background:#203d40;color:inherit;border:1px solid #50685f;border-radius:10px;padding:17px 15px;min-height:105px}
+    .diagram-node:hover{background:#2c4c48;border-color:var(--green)}
+    .diagram-node strong{display:block;font-size:14px;line-height:1.4;margin:5px 0}
+    .diagram-node span{display:block;color:#b9ccc2;font-size:11px;line-height:1.5}
+    .diagram-node .eyebrow{color:var(--green);font-size:10px}
+    .boundary{padding:12px 0;text-align:center;color:#d2e3bf;font:11px/1.7 ui-monospace,monospace}
+    .loop-caption{font-size:12px;color:#c1d3c4;margin-top:18px;padding-top:15px;border-top:1px dashed #60756c}
+    .trace-controls{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:18px}
+    .trace-label{color:var(--teal)}
+    .trace-step{font-size:21px;margin:0 0 8px}
+    .trace-dots{display:flex;gap:5px;margin:20px 0 0}
+    .trace-dots span{height:4px;flex:1;background:#e1e6d9;border-radius:10px}
+    .trace-dots span.active{background:var(--teal)}
+    .trace-code{font-size:12px!important;margin-top:16px!important}
+    .flow-list{list-style:none;padding:0;margin:0;counter-reset:flow;display:grid;gap:0}
+    .flow-list li{position:relative;counter-increment:flow;padding:14px 18px 14px 53px;border-bottom:1px solid var(--line);font-size:14px}
+    .flow-list li:last-child{border-bottom:0}
+    .flow-list li::before{content:counter(flow,decimal-leading-zero);position:absolute;left:16px;top:16px;color:var(--teal);font:12px ui-monospace,monospace}
+    .flow-card{padding:5px}
+    pre{background:#172e32;color:#e5eee0;border:1px solid #3b5453;border-radius:12px;padding:20px;overflow-x:auto;font:12px/1.8 ui-monospace,SFMono-Regular,Consolas,monospace;tab-size:2;margin:0;max-width:100%}
+    code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;overflow-wrap:anywhere}
+    .code-caption{font-size:11px;color:var(--muted);margin:10px 0 0}
+    .nuances{display:grid;gap:12px}
+    .nuance{padding:17px 20px;border:1px solid var(--line);border-radius:11px;background:var(--card)}
+    .nuance h3{font-size:14px}
+    .nuance p{font-size:14px;color:var(--muted);margin:0}
+    .table-scroll{overflow:auto;border:1px solid var(--line);border-radius:12px}
+    table{width:100%;border-collapse:collapse;font-size:13px;text-align:left;background:var(--card)}
+    th{font:650 11px/1.5 ui-monospace,monospace;text-transform:uppercase;letter-spacing:.04em;background:#e9eee2}
+    th,td{padding:14px 17px;border-bottom:1px solid var(--line);vertical-align:top}
+    tr:last-child td{border-bottom:0}
+    td:first-child{font-weight:650;width:23%}
+    td{color:var(--muted)}
+    .qa-toolbar{display:flex;gap:10px;justify-content:space-between;align-items:center;margin-bottom:13px}
+    .qa-toolbar p{margin:0;color:var(--muted);font-size:13px}
+    .question{border:1px solid var(--line);background:var(--card);border-radius:11px;margin:10px 0;overflow:hidden}
+    .question summary{padding:18px 21px;cursor:pointer;font-size:15px;font-weight:650;line-height:1.55}
+    .question summary::marker{color:var(--teal)}
+    .question[open] summary{border-bottom:1px solid var(--line);background:#edf1e5}
+    .q-number{color:var(--teal);font:11px ui-monospace,monospace;margin-right:8px}
+    .answer{padding:20px 24px;font-size:14px}
+    .answer p{margin-bottom:12px}
+    .answer p:last-child{margin-bottom:0}
+    .follow{border-left:2px solid #b5c990;padding-left:13px;color:var(--muted);font-size:13px}
+    .follow strong{color:var(--teal)}
+    .source-list{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0;margin:0}
+    .source-list a{font:11px/1.6 ui-monospace,monospace;border:1px solid var(--line);background:var(--card);padding:7px 10px;border-radius:7px;display:block}
+    .source-note{font-size:11px;color:var(--muted);margin:10px 0 0}
+    .bottom-nav{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:34px;border-top:1px solid var(--line);padding-top:25px}
+    .page-nav{display:block;text-align:left;padding:15px 19px;background:var(--card);border:1px solid var(--line);border-radius:10px;text-decoration:none;color:var(--ink);min-width:0}
+    .page-nav span{display:block;color:var(--muted);font-size:11px;margin-bottom:4px}
+    .page-nav strong{font-size:14px}
+    .page-nav.next{text-align:right}
+    footer{font-size:11px;color:var(--muted);margin-top:30px}
+    .practice-mode .study-only{display:none!important}
+    .practice-banner{display:none;border:1px solid #bbcf8f;background:#e8f1d1;border-radius:10px;padding:13px 17px;margin:20px 0;font-size:13px}
+    .practice-mode .practice-banner{display:block}
+    .pitch{font-size:16px!important;line-height:1.8!important;color:var(--ink)!important}
+    .glossary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 26px}
+    .glossary dt{font-weight:700;font-size:13px}
+    .glossary dd{margin:3px 0 0;font-size:13px;color:var(--muted)}
+    .no-script{padding:30px;background:#fff2dc}
+    #print-guide{display:none}
+    @media(min-width:1500px){main{padding-left:58px;padding-right:58px}}
+    @media(max-width:1050px){.layout{grid-template-columns:230px minmax(0,1fr)}.sidebar{padding:22px 14px}main{padding:30px 25px}.cards{grid-template-columns:1fr}.diagram-node{padding:13px 10px}.topbar{padding:13px 22px}.reading-meta{display:none}}
+    @media(max-width:760px){.topbar{position:relative;align-items:flex-start;padding:17px;gap:12px;flex-wrap:wrap}.tools{gap:7px}.tools .button{padding:7px 9px;font-size:11px}.layout{display:block}.sidebar{position:relative;top:0;height:auto;border-right:0;border-bottom:1px solid var(--line);padding:18px}.sidebar nav{display:flex;gap:5px;overflow-x:auto;max-height:190px;flex-wrap:wrap;padding:4px}.nav-group,.sidebar-foot,.search-key{display:none}.topic-link{padding:7px 9px;margin:0;font-size:11px;gap:6px;border-color:var(--line);background:var(--card)}#search-status{margin:7px 0 8px}main{padding:25px 18px 35px}.breadcrumb{font-size:10px;margin-bottom:15px}h1{font-size:35px}.lede{font-size:16px}.architecture{padding:20px 16px}.diagram-row{grid-template-columns:1fr}.diagram-node{min-height:0;padding:13px 15px}.diagram-node span{font-size:12px}.cards,.glossary{grid-template-columns:1fr}.card{padding:19px}.section-heading h2{font-size:21px}.section-heading .eyebrow{font-size:9px}.qa-toolbar{align-items:flex-start}.question summary{padding:16px;font-size:14px}.answer{padding:17px}.bottom-nav{gap:10px}.page-nav{padding:12px}.page-nav strong{font-size:12px}.chips{margin-bottom:18px}pre{padding:15px;font-size:11px}.table-scroll table{min-width:570px}}
+    @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
+    @media print{@page{margin:17mm}body{font-size:10pt;background:white;color:black}.layout,.topbar,.skip{display:none!important}#print-guide{display:block}#print-guide article{break-before:page}#print-guide article:first-child{break-before:auto}h1{font-size:28pt}h2{font-size:17pt}.cards,.diagram-row,.glossary{display:block}.card,.question,.nuance{break-inside:avoid;margin-bottom:10px}#print-guide .study-only,.practice-mode #print-guide .study-only{display:block!important}#print-guide .practice-banner{display:none!important}.question .answer{display:block}.architecture{background:#f3f3f3;color:black}.diagram-node{color:black;background:white;display:block;width:100%;margin-bottom:8px}.diagram-node span,.diagram-node .eyebrow,.architecture>p,.lane-label,.boundary,.loop-caption{color:#333}.screen-only,.trace-controls,.trace-dots,.qa-toolbar,.source-list a::after{display:none!important}pre{white-space:pre-wrap;overflow-wrap:anywhere;color:black;background:#eee;border-color:#aaa;font-size:8pt}.table-scroll{overflow:visible}table{font-size:9pt;min-width:0!important}.source-list a{color:black;text-decoration:none}.source-note{font-size:8pt}.section-heading{margin-top:20px}}
+  </style>
+</head>
+<body>
+  <a class="skip" href="#content">Skip to learning material</a>
+  <header class="topbar">
+    <a class="brand" href="#overview" aria-label="Habitat interview guide home">
+      <span class="brand-mark" aria-hidden="true">H</span>
+      <span><strong>HABITAT</strong><small>ENGINEERING / INTERVIEW FIELD GUIDE</small></span>
+    </a>
+    <div class="tools" aria-label="Study tools">
+      <button class="button" id="practice" type="button" aria-pressed="false">Practice mode</button>
+      <button class="button" id="random" type="button">Random question</button>
+      <button class="button" id="print" type="button">Print / PDF</button>
+    </div>
+  </header>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Learning navigation">
+      <label class="eyebrow" for="search">Find a component or question</label>
+      <div class="search-wrap"><input id="search" type="search" placeholder="Try: cancellation, image, BFS" autocomplete="off" aria-controls="topic-nav" aria-describedby="search-status"><span class="search-key" aria-hidden="true">/</span></div>
+      <p id="search-status" role="status" aria-live="polite"></p>
+      <nav id="topic-nav" aria-label="Project components"></nav>
+      <div class="sidebar-foot"><strong>Code, not a sales pitch.</strong>Implementation facts, limitations, and proposed alternatives are kept distinct. No external assets, libraries, or model calls are needed to use this guide.</div>
+    </aside>
+    <main id="content" tabindex="-1">
+      <div class="breadcrumb"><span class="eyebrow" id="breadcrumb"></span><span class="reading-meta" id="reading-meta"></span></div>
+      <div id="article"></div>
+      <nav class="bottom-nav" id="bottom-nav" aria-label="Previous and next component"></nav>
+      <footer>Source snapshot <code>dd885dd</code> / Prepared 12 November 2026. This is a local simulation prototype, not a production robotics platform.</footer>
+    </main>
+  </div>
+  <div id="print-guide"></div>
+  <noscript><div class="no-script">This self-contained guide uses JavaScript for component navigation and answer cards. Enable JavaScript; no internet connection is required.</div></noscript>
+  <script>
+    "use strict";
+    const snapshot = "dd885dd6b609ec7c80f7fcaea284c5e89a38be9e";
+    const modules = [
+      {
+        id: "overview", group: "Start here", title: "The system at a glance",
+        subtitle: "A local, image-conditioned VLM proposes rover actions. A browser-owned simulator validates, executes, and checks delivery.",
+        tags: ["System design", "Ownership boundaries", "Honest project pitch"],
+        sources: [["README.md", 3], ["PLAN.md", 85], ["web/src/main.ts", 153]],
+        concepts: [
+          ["The 60-second interview pitch", "We built a browser-based 3D habitat where a user asks a rover to deliver a colored container. Three.js renders the scene and captures a real image. A FastAPI backend validates the observation, sends image plus state to Qwen2.5-VL through Ollama, and parses one constrained action. The browser checks response correlation and runs deterministic navigation and manipulation. Delivery is checked from scene state rather than trusting the model's finish message. The current implementation also has instruction-based target overrides, so we describe it as a hybrid VLM-and-rules prototype, not proof of unrestricted visual autonomy."],
+          ["Browser = simulation authority", "The browser owns geometry, target registry, transforms, carry state, navigation, mission lifetime, and the delivery check. World state is in memory in one tab. There is no backend world database, shared multiplayer simulation, or real robot."],
+          ["Backend = decision boundary", "FastAPI owns request/image validation, prompt construction, HTTPX calls, parsing, target eligibility checks, and structured HTTP errors. It does not navigate the rover or store mission history."],
+          ["Model = bounded proposal", "Qwen2.5-VL 3B receives pixels and observation metadata, then proposes navigate_to, pick_up, place_on, stop, or finish. It supplies neither arbitrary code nor motor coordinates. There is no model training or fine-tuning code in this repository."]
+        ],
+        flow: ["Enter a supported instruction and start a fresh mission session.", "Capture the rendered canvas and snapshot target/carry/result metadata.", "POST /step; validate the observation, then call Ollama /api/chat.", "Parse and validate the model proposal; return IDs and inference timing.", "Browser checks correlation, may override the target from instruction rules, and dispatches a primitive or pick-and-place macro.", "Inspect delivery state. End on verified success, stop, error, or the 12-observation bound; otherwise observe again."],
+        codeTitle: "The three-process development topology",
+        code: "Browser / Vite :5173\n  |  JSON with JPEG + observation\n  v\nFastAPI / Uvicorn :8000\n  |  HTTPX -> POST /api/chat\n  v\nOllama :11434 -> qwen2.5vl:3b\n\nReturn path: proposed action -> browser controller -> scene state\nNo database / message broker / WebSocket / ROS in the current design.",
+        nuances: [
+          ["Not an end-to-end VLA policy", "This is a vision-language-model action pipeline with hand-written control. No learned low-level action policy, physical grasping, or real-world perception-to-actuation stack is implemented."],
+          ["Plan versus implementation", "PLAN.md contains proposals as well as status notes. Do not claim that every planned deadline, log, evaluation, or safety invariant already exists. The source and tests are the authority."],
+          ["The assignment caveat", "The assignment names Unity or Unreal. This repository uses Three.js; instructor acceptance is still documented as unconfirmed."]
+        ],
+        alternatives: [
+          ["Unity / Unreal", "When assignment compliance, editor tooling, physics, or richer simulation is essential.", "More installation and integration work; Three.js makes the current demo easy to run in a browser."],
+          ["Rules-only application", "For a fixed color-to-ID scene and a small set of task templates.", "Fast and deterministic, but would not demonstrate general image-conditioned reasoning."],
+          ["Model-generated motor control", "For research with a suitable simulator and learned policies.", "Much harder to constrain, evaluate, and keep safe than high-level proposals plus deterministic skills."]
+        ],
+        questions: [
+          ["Explain the design in one minute.", "Start with the user task, then name the three processes and the data crossing each boundary. Finish with browser-owned execution/verification and the important qualification that target rewriting makes this a hybrid system. Do not claim general autonomous robotics.", "Push further: explain why model capability and end-to-end demo success must be evaluated separately."],
+          ["Which component is the source of truth?", "The browser's HabitatWorld owns this tab's world. The backend can validate consistency with submitted metadata, but cannot independently know whether that metadata matches the real scene. The model is advisory.", "A multi-user or real-robot version would need a stronger authoritative execution service."],
+          ["Is the application closed loop?", "It can capture a new observation after an action and include the previous result, up to 12 observations. However, pick_up can trigger a multi-phase deterministic macro and terminate on delivery without another model decision. It is not a continuous visual motor-control loop.", "Distinguish decision-level feedback from feedback at every control timestep."],
+          ["Why not build everything in the backend?", "Rendering, interaction, and transforms already live in the browser, so local control avoids sending frame-by-frame movement over the network. The backend isolates model serving and validation. Centralizing simulation would improve authority and sharing but add infrastructure and latency.", "No database was necessary for the original single-tab local demo."],
+          ["What would you refuse to overclaim?", "I would not claim robust visual grounding, arbitrary instruction understanding, collision-perfect physics, exactly-once execution, production security, or proven reliability from one successful demo. The guide distinguishes implemented behavior from suggested improvements.", "Changed color-to-ID evaluation is especially important because the current parser and overrides can mask model errors."]
+        ]
+      },
+      {
+        id: "scene", group: "Browser engine", title: "Three.js, rendering & image capture",
+        subtitle: "A real WebGL scene is both the user interface's world view and the model's visual input.",
+        tags: ["Three.js", "WebGL", "OrbitControls", "Canvas JPEG"],
+        sources: [["web/src/world.ts", 35], ["web/src/world.ts", 78], ["web/src/world.ts", 113], ["web/src/world.ts", 574], ["web/src/world.ts", 612], ["web/index.html", 1]],
+        concepts: [
+          ["Scene graph and generated assets", "HabitatWorld builds the habitat, rover, containers, platforms, table, shelving, and door from geometry and materials. Meshes combine into Groups so the rover and carried object can move together. CanvasTexture-backed Sprites provide readable world labels. No imported 3D asset pipeline is required."],
+          ["Camera, lighting, and materials", "A PerspectiveCamera uses a 42-degree field of view, near/far planes 0.1/80, and OrbitControls for orbit and zoom. Hemisphere, directional, and point lights illuminate MeshStandardMaterial surfaces. Shadows, sRGB output, ACES filmic tone mapping, and fog shape the appearance."],
+          ["Rendering without blocking inference", "requestAnimationFrame continuously updates controls and renders. Fetch and animations are asynchronous, so a slow model response does not itself block rendering. Pixel ratio is capped at 1.5; ResizeObserver updates camera aspect and renderer size."],
+          ["Actual image capture", "The renderer is created with preserveDrawingBuffer: true. captureJpeg renders immediately, calls toDataURL('image/jpeg', 0.78), and removes the data-URL prefix. Only the WebGL canvas is sent, not the surrounding DOM mission panel."]
+        ],
+        flow: ["Construct scene, camera, renderer, controls, geometry, and lights.", "Render on animation frames; update camera framing when the host resizes.", "At a decision boundary, render again before reading canvas pixels.", "Encode JPEG as base64 and send with image_media_type='image/jpeg'.", "On page unload, stop movement, cancel the render frame, disconnect resizing, and dispose controls/renderer."],
+        codeTitle: "Actual capture excerpt",
+        code: "captureJpeg(): string {\n  this.renderer.render(this.scene, this.camera);\n  return this.renderer.domElement\n    .toDataURL(\"image/jpeg\", 0.78).split(\",\", 2)[1] ?? \"\";\n}",
+        nuances: [
+          ["Image quality is a control-system input", "Orbit and viewport size affect what the model can see. A readable label at one camera angle may be tiny or occluded at another. The current capture uses the live viewport; it is not resized to a fixed model resolution."],
+          ["Readback has a cost", "preserveDrawingBuffer and synchronous toDataURL readback can cost memory and main-thread time. Base64 adds about one-third to binary size. Large displays can create images that the backend rejects."],
+          ["Cleanup is partial", "dispose releases controls and renderer, but does not explicitly traverse and dispose every geometry, material, and CanvasTexture. Repeated world construction in a long-lived SPA would need more resource management."],
+          ["Standalone guide versus app", "This guide has no external assets. The actual app's HTML references Google Fonts; its core scene uses generated geometry."]
+        ],
+        alternatives: [
+          ["Offscreen render target + fixed capture size", "For stable model inputs independent of the visible UI viewport.", "More rendering/readback code, but more repeatable framing and lower payload variance."],
+          ["toBlob + multipart / binary upload", "When main-thread encoding or base64 overhead matters.", "An asynchronous pipeline and a different request contract replace the simple JSON-only API."],
+          ["Unity / Unreal / Babylon.js", "For editor-first authoring, stronger engine features, or a different browser engine.", "Evaluate packaging, physics, licensing, team familiarity, and the assignment constraints."]
+        ],
+        questions: [
+          ["Why use Three.js rather than a full game engine?", "It provides scene graph, WebGL rendering, camera controls, and an easy browser deployment path without a game-engine installation. The trade-off is that navigation, interaction rules, and simplified collision logic are hand-written, and the assignment may require another engine.", "Explain the product constraint before comparing engine feature lists."],
+          ["What does preserveDrawingBuffer do here?", "It asks WebGL to preserve the drawing buffer after presentation, supporting canvas capture. The code also explicitly renders before reading pixels. Preservation can reduce rendering efficiency, so a dedicated capture pass is an alternative.", "It does not improve image semantics or guarantee model accuracy."],
+          ["Why JPEG quality 0.78?", "It is the implementation's compression setting for reasonably compact scene screenshots. It is not a measured optimum. Compression can harm small text and color boundaries; compare quality, pixel count, latency, and task success experimentally.", "PNG preserves text better but can produce a larger payload."],
+          ["What can break image capture?", "A lost/unavailable WebGL context, poor framing, oversized viewport, or future cross-origin textures without appropriate CORS can cause problems. The backend also rejects invalid or oversized images. Current generated geometry avoids a cross-origin texture dependency.", "Do not confuse a successfully encoded image with a useful model observation."],
+          ["How would you optimize the renderer?", "Measure frame time and capture cost first. Consider fixed-resolution capture, reduced shadows/pixel ratio, geometry/material reuse or instancing, and explicit disposal. Keep model-input legibility as a quality constraint.", "Rendering throughput and model inference latency are separate bottlenecks."]
+        ]
+      },
+      {
+        id: "registry", group: "Browser engine", title: "World state & visual grounding",
+        subtitle: "Stable IDs connect pixels to actionable objects, but the observation is an engineered registry, not general scene discovery.",
+        tags: ["Map registry", "IDs", "Observation metadata", "Grounding limits"],
+        sources: [["web/src/world.ts", 14], ["web/src/world.ts", 391], ["web/src/world.ts", 585], ["web/src/world.ts", 617], ["web/src/main.ts", 30]],
+        concepts: [
+          ["Authoritative target registry", "A Map stores each target's ID, label, category, color, root Group, groundPosition, status, marker, and optional deliveredTo. The three containers have fixed color-to-ID assignments. delivery_01 and delivery_02 identify the platforms."],
+          ["What the model receives", "getVisibleTargets sends target_id, category, and in_interaction_range. It omits color descriptions and world coordinates. Colors and labels remain visible in the actual image, including color words in container label sprites."],
+          ["What 'visible' really means", "The function includes every target whose status is not delivered. It does not perform camera-frustum, occlusion, or pixel-visibility tests. A held target is not filtered out, and its stored groundPosition is not updated while attached to the rover."],
+          ["Delivery evidence", "isDelivered checks the target's delivered status and optionally deliveredTo. Those fields are set by placeOn. This is browser scene-controller state verification, not an independent physics sensor or geometric containment test."]
+        ],
+        flow: ["Build containers with IDs object_01 / object_02 / object_03 and two platform IDs.", "Keep meshes and interaction state in the browser registry.", "Exclude delivered targets, then derive category and distance-based range flags.", "Send the compact registry alongside the canvas image.", "Resolve proposed IDs back to world objects before execution; inspect status and destination after placement."],
+        codeTitle: "The observation's actual filter",
+        code: "getVisibleTargets(): TargetDescriptor[] {\n  return [...this.targets.values()]\n    .filter((target) => target.status !== \"delivered\")\n    .map((target) => ({\n      target_id: target.id,\n      category: target.category,\n      in_interaction_range: this.robot.position\n        .distanceTo(target.groundPosition)\n        <= (target.category === \"platform\" ? 1.95 : 1.65),\n    }));\n}",
+        nuances: [
+          ["Metadata is not a perception result", "A registry is a useful simulation affordance, but calling it visible does not make it an actual visibility detector. The model can be offered an ID whose pixels are occluded or outside the current view."],
+          ["Static mappings weaken the experiment", "The same blue object is always object_01. In addition, the UI parses color words and rewrites proposed IDs. A successful delivery therefore does not isolate whether the VLM used the image correctly."],
+          ["Trust is local, not adversarial", "The backend validates against the submitted observation, not an independent world. A production backend should not treat client-supplied state as proof that a robot can safely execute an action."]
+        ],
+        alternatives: [
+          ["Frustum + occlusion-aware observation", "When actions must refer only to genuinely visible objects.", "More computation and edge cases, but aligns the API name with image evidence."],
+          ["Object detection / segmentation + grounding", "For unknown objects or a less instrumented environment.", "Needs perception models, uncertainty handling, tracking, and robust ID assignment."],
+          ["Randomized layout and ID/color mapping", "To test whether selection follows the image rather than fixed rules.", "Requires reproducible seeds and an evaluator separated from the decision path."]
+        ],
+        questions: [
+          ["Why use stable target IDs?", "They provide a narrow symbolic interface between perception and execution. The model chooses an allowlisted ID; the controller owns the coordinates and implementation. IDs improve debuggability without allowing arbitrary spatial commands.", "Stable does not mean semantically meaningful: randomize mappings for evaluation."],
+          ["Does visible_targets mean the camera can see each target?", "No. It currently means registered and not delivered. There is no frustum or occlusion test. A precise interview answer names that limitation rather than attributing perception capabilities to a registry filter.", "A better name would reflect action eligibility unless actual visibility is implemented."],
+          ["Are colors leaked through metadata?", "Color fields are not sent in target descriptors. However, color words are rendered into label sprites, IDs are fixed, and browser rules map text colors to IDs. These are separate channels that complicate claims about visual color recognition.", "Evaluate with remapped IDs, altered labels, and controlled image ablations."],
+          ["Is the completion check independent?", "It is independent of the model's finish proposal, which is valuable. But it relies on status/deliveredTo set by the same scene controller, not an independent geometry/physics check. It does not scan for every unintended delivery.", "Independent of the model is not the same as independent of the executor."],
+          ["How would you generalize the world model?", "Separate immutable target identity, observed state, execution state, and physical pose. Update poses during carrying, compute genuine visibility, and attach observation timestamps or world revisions. For a real robot, use tracked detections with confidence and reconciliation.", "The current Map is an appropriate small-demo starting point, not a distributed digital twin."]
+        ]
+      },
+      {
+        id: "mission", group: "Browser engine", title: "UI & mission orchestration",
+        subtitle: "Vanilla TypeScript coordinates observations, model decisions, deterministic overrides, and the user's mission feedback.",
+        tags: ["DOM", "12 observations", "Target rewriting", "Hybrid reasoning"],
+        sources: [["web/src/main.ts", 40], ["web/src/main.ts", 130], ["web/src/main.ts", 153], ["web/src/main.ts", 222], ["web/src/main.ts", 320], ["web/src/api.ts", 50], ["web/src/style.css", 21], ["web/index.html", 1]],
+        concepts: [
+          ["Small explicit UI, no framework", "main.ts binds DOM elements, builds the target registry, handles manual/model actions, and updates status. CSS Grid gives the desktop scene a 366px mission panel (330px below 1000px); at 760px and below, the scene and panel stack and the page scrolls. World readouts and the clock refresh every 500 ms; API/model health is polled every 15 seconds."],
+          ["Mission-scoped state", "A mission creates a session UUID, request UUID per observation, AbortController, and activeRun generation. It disables instruction editing, tracks previousActionResult, and allows at most 12 observation requests. This is imperative control flow and UI strings, not a formal state-machine library."],
+          ["The deterministic instruction parser", "expectedTargetFor prefers an explicit object_01/02/03 ID, then matches 'red', then 'yellow', otherwise defaults to blue object_01. expectedPlatformFor matches documented room-2 phrases; otherwise delivery_01. A regex recognizes north/south/east/west side of the table."],
+          ["The model target can be replaced", "After correlation checks, an empty-handed navigate_to or pick_up target is overwritten with the parsed expected container. When carrying, navigate_to or place_on is overwritten with the parsed platform. The displayed Qwen decision is therefore the modified proposal, not necessarily the raw model output."]
+        ],
+        flow: ["Trim instruction; reject a start while already running or while carrying a different expected container.", "Reset mission-local counters/results and capture a fresh scene for each observation.", "Request one decision; show elapsed waiting seconds while awaiting the response.", "Check session/request/observation IDs and current run generation.", "Rewrite applicable target IDs, then process finish, stop, a delivery macro, or a primitive action.", "Verify the expected container/platform pair, track repeated primitive failures, and restore controls in finally for the current run."],
+        codeTitle: "Actual target-override excerpt",
+        code: "const proposal = response.proposal;\nif (!world.getHeldObjectId()\n    && (proposal.action === \"navigate_to\" || proposal.action === \"pick_up\")) {\n  proposal.target_id = expectedTargetId;\n}\nif (world.getHeldObjectId()\n    && (proposal.action === \"navigate_to\" || proposal.action === \"place_on\")) {\n  proposal.target_id = expectedPlatformId;\n}",
+        nuances: [
+          ["Unsupported instructions do not reliably fail closed", "A request without a supported color or explicit ID defaults to blue. A request without a room-2 phrase defaults to platform 1. The source does not implement the planning document's ideal clarification flow."],
+          ["The action is still model-influenced", "The model can propose a navigation primitive, pick_up macro trigger, stop, or finish. But target identity may be fixed by rules. Separate action selection, target selection, route parsing, and execution when describing contributions."],
+          ["Loop bounds are not total time bounds", "There are at most 12 observations and a stop after two identical primitive failure signatures. There is no explicit whole-mission wall-clock deadline, and the macro has its own early-exit path."],
+          ["Manual actions are not fully serialized", "Manual commands are blocked during a VLM mission, but manual actions do not themselves set running=true. Rapid manual clicks can overlap or invalidate an earlier movement token. This is a useful next test, not a claim of a command queue."],
+          ["Some telemetry is presentation-only", "Coordinates, carry state, target status, and model health are updated from actual application state. The PWR 84% battery, RUN 001 label, and container kilogram descriptions are static UI copy, not a battery simulation, mission counter, or physics mass model. The activity area is aria-live but keeps only four recent rows."]
+        ],
+        alternatives: [
+          ["Remove target rewriting", "When measuring the VLM's real visual target selection.", "Expect lower reliability initially; retain deterministic verification, fail clearly, and log raw versus executed decisions."],
+          ["Typed task parser with clarification", "When supported instructions should have explicit semantics.", "More UX and parsing work, but avoids silently treating unsupported requests as blue-container tasks."],
+          ["Formal state machine / behavior tree", "When missions add more phases, recovery, or concurrent interactions.", "More structure and testability at the cost of extra machinery for a small demo."]
+        ],
+        questions: [
+          ["What does the VLM actually decide in this implementation?", "It proposes an action and target, but main.ts rewrites applicable target IDs using deterministic instruction parsing. Its action choice still affects dispatch. The browser also chooses route/platform policy and runs the multi-phase controller.", "Report raw proposal, rewritten proposal, and executed action separately in an evaluation."],
+          ["What happens for 'pick up the green container'?", "There is no green-object parser branch; absent an explicit supported ID, expectedTargetFor defaults to object_01. Depending on the model action, the override can direct execution to blue. This is a limitation, not supported arbitrary language understanding.", "A typed unsupported/ambiguous result should replace this default in a generalized version."],
+          ["What bounds an action loop?", "The for-loop allows observation IDs 0 through 11. Primitive failures with the same action:target:error signature stop after two consecutive occurrences. Macro failures break immediately. This is not a navigation deadline or guaranteed total task duration.", "The UI may return to standby after exhaustion rather than display a dedicated budget-exhausted state."],
+          ["How does the UI stay responsive during inference?", "It awaits fetch without blocking the browser's event loop. Rendering and status timers continue. It disables conflicting mission inputs and provides a local stop. Synchronous canvas encoding can still briefly block the main thread.", "Do not describe async as making the model computation itself faster."],
+          ["Why is the displayed decision not a faithful model log?", "formatAction is called after the target override mutates response.proposal. Thus the event labeled Qwen may show a rule-selected target. It is a useful execution readout but not raw-model evidence.", "Store immutable raw and effective proposals if you want trustworthy debugging or model comparisons."],
+          ["Would React solve the lifecycle problems?", "A UI framework could improve component organization, but it does not automatically solve cancellation races, command serialization, or authoritative world state. Those require explicit state and execution design regardless of rendering library.", "A small typed reducer/state machine may matter more than a framework migration."]
+        ]
+      },
+      {
+        id: "contract", group: "Decision service", title: "Contracts & image validation",
+        subtitle: "Pydantic turns untrusted JSON and image bytes into a narrow observation/action interface.",
+        tags: ["Pydantic v2", "Discriminated union", "Pillow", "Allowlist"],
+        sources: [["backend/app/schemas.py", 12], ["backend/app/schemas.py", 23], ["backend/app/schemas.py", 69], ["backend/app/schemas.py", 100], ["backend/app/schemas.py", 139], ["web/src/api.ts", 1]],
+        concepts: [
+          ["Five distinct action shapes", "ActionProposal is an action-discriminated union of NavigateTo, PickUp, PlaceOn, Stop, and Finish. Target-bearing actions require a target_id; stop and finish do not allow it. StrictModel forbids extra fields. That name does not enable Pydantic's global strict-type mode."],
+          ["Observation structure", "StepRequest requires session/request UUIDs, a nonnegative observation_id, a nonblank 1-1000-character instruction, JPEG or PNG media type, base64 image, at most 64 unique target descriptors, optional held_object_id, and optional previous result. There is no separate step-number field in the implemented request."],
+          ["Actual image verification", "Base64 is validated, decoded bytes must be 1 through 2 MiB, and Pillow opens and fully loads the image. Width and height must each be at most 4096 and total pixels at most 8,388,608. The decoded format must match the declared PNG/JPEG media type."],
+          ["Semantic proposal checks", "validate_proposal_target requires a target in the observation, container for pick_up, platform for place_on, empty hands for pickup, and an object held for placement. Range is deliberately not required at this boundary because high-level pickup can approach first."]
+        ],
+        flow: ["FastAPI parses JSON into StepRequest and runs field/model validators.", "Reject bad base64, excessive decoded size, invalid/truncated image data, format mismatch, or duplicate target IDs.", "Send the validated observation to the model client.", "Use TypeAdapter to parse the model JSON into the discriminated union.", "Validate the proposal target against observation metadata before returning StepResponse."],
+        codeTitle: "Wire contract (illustrative shape, not a runnable image request)",
+        code: "{\n  \"session_id\": \"8ddf8a11-e405-4055-a8d1-cbf5a28acee2\",\n  \"request_id\": \"317f3118-4a2d-44c6-ae89-54f074f8cdce\",\n  \"observation_id\": 0,\n  \"instruction\": \"Pick up the blue container.\",\n  \"image_media_type\": \"image/jpeg\",\n  \"image_base64\": \"<actual JPEG base64 goes here>\",\n  \"visible_targets\": [{\n    \"target_id\": \"object_01\", \"category\": \"container\",\n    \"in_interaction_range\": false\n  }],\n  \"held_object_id\": null,\n  \"previous_action_result\": null\n}\n\n// Successful response shape:\n{\n  \"session_id\": \"<matching session UUID>\",\n  \"request_id\": \"<matching request UUID>\",\n  \"observation_id\": 0,\n  \"action_id\": \"<backend-generated UUID>\",\n  \"proposal\": {\"action\": \"pick_up\", \"target_id\": \"object_01\"},\n  \"inference_ms\": 17000\n}",
+        nuances: [
+          ["Do not claim a complete ingress size limit", "The schema limits the image field and decoded image, but the code does not install an HTTP-server/reverse-proxy total-body limit. JSON is parsed before the schema validates it."],
+          ["Prompt restrictions exceed some validators", "The prompt's navigate_to target set depends on carry state. The backend semantic validator only checks that a navigate_to target is in the submitted list; it does not repeat that carry/category restriction."],
+          ["TypeScript types are not runtime validation", "api.ts uses type assertions for response JSON, and its ActionProposal has an optional target_id instead of a discriminated union with required targets. The browser does not implement a full response schema validator."],
+          ["Identifier and resource details", "Target IDs match an ASCII alphanumeric first character followed by up to 63 alphanumeric, underscore, or hyphen characters. Maximum encoded image length is 2,796,204 characters. Base64 is decoded in both size and image validators, and full image load uses CPU/memory."]
+        ],
+        alternatives: [
+          ["Generated client types + runtime schemas", "To keep Python and TypeScript contracts synchronized.", "OpenAPI generation helps drift, but generated static types alone still do not validate response bytes."],
+          ["Multipart / object-storage image references", "For larger captures or repeated image reuse.", "Less base64 overhead, but more endpoints, authorization, lifetime management, and validation rules."],
+          ["Versioned observation schema", "When clients/models evolve independently.", "Adds migration and compatibility policies; useful before multiple deployed clients exist."]
+        ],
+        questions: [
+          ["Why a discriminated union?", "The action value selects the correct model, enforcing distinct parameter rules. A single loose action object with an optional target would permit invalid combinations unless checked manually. Extra fields are forbidden to keep the surface narrow.", "The current browser type is looser than the backend union."],
+          ["Why validate image bytes rather than the MIME string?", "The MIME field is supplied by the caller. Valid base64 can decode to non-image data or a truncated file. Pillow verifies actual format, dimensions, and loading, so a header string alone cannot establish a valid observation.", "Validation is resource-consuming; enforce a raw ingress size cap before parsing too."],
+          ["What is the base64 overhead?", "Encoded length is 4 * ceil(decoded_bytes / 3), about 33% overhead before JSON and other metadata. A 2 MiB decoded limit corresponds to at most 2,796,204 base64 characters.", "Pixel count also matters because compressed file size is not decoded memory size."],
+          ["Why can pickup be accepted while out of range?", "The API action has high-level semantics: pick_up can select a target for a controller that approaches before manipulation. The browser's primitive pickUp still enforces the 1.65 range threshold at execution time.", "Separate proposal eligibility from instantaneous physical preconditions."],
+          ["Does StrictModel mean no coercion?", "No. Here it sets extra='forbid'. It rejects unexpected keys but does not globally turn on Pydantic strict=True. Do not use the class name as evidence for stronger type semantics.", "A stricter API could explicitly choose strict fields and test its compatibility impact."],
+          ["What protects against response drift on the browser?", "Currently mainly trusted-backend assumptions, selected correlation checks, and world-controller preconditions. Type assertions do not check runtime structure. A generated runtime validator and shared discriminated action schema would make the boundary stronger.", "Do not claim that all malformed successful responses are already rejected by a client schema."]
+        ]
+      },
+      {
+        id: "api", group: "Decision service", title: "FastAPI & asynchronous transport",
+        subtitle: "A small stateless HTTP service exposes health and one-step decision making; Uvicorn serves it through ASGI.",
+        tags: ["FastAPI", "ASGI / Uvicorn", "HTTPX", "Dependency injection"],
+        sources: [["backend/app/main.py", 15], ["backend/app/main.py", 20], ["backend/app/main.py", 25], ["backend/app/main.py", 40], ["backend/app/main.py", 49], ["web/src/api.ts", 42]],
+        concepts: [
+          ["Application factory and replaceable model", "create_app accepts Settings and a DecisionModel, enabling tests to inject FakeModel. DecisionModel is a Python Protocol with is_ready, propose, and aclose; it is a structural interface, not a model implementation."],
+          ["Shared async HTTP client", "OllamaModelClient owns one httpx.AsyncClient for connection reuse. FastAPI's lifespan closes it on shutdown. Async waiting avoids blocking the event loop on model I/O, but synchronous image validation can still consume the server thread's time."],
+          ["Two application endpoints", "GET /health reports status, model_ready, and configured model. POST /step returns a correlated proposal, backend-generated action UUID, and inference_ms. FastAPI also supplies its standard OpenAPI/docs endpoints."],
+          ["Errors stay errors", "Request validation becomes 422 invalid_request. A semantically invalid target/proposal becomes 422 invalid_proposal. Model timeout becomes 504 inference_timeout; unavailable model or invalid model JSON becomes 502 with a model error code. There is no fabricated movement fallback."]
+        ],
+        flow: ["Browser fetches the configured API base URL (default 127.0.0.1:8000).", "CORS allows the two Vite localhost origins, GET/POST, and content-type.", "FastAPI validates a StepRequest and awaits propose.", "Catch domain model errors or target-check ValueError and return a structured error object.", "On success, echo correlation fields and create an action UUID in application code.", "Close the shared model HTTP client on application shutdown."],
+        codeTitle: "Error and success boundary",
+        code: "GET /health\n200 {\"status\":\"ok\", \"model_ready\":true, \"model\":\"qwen2.5vl:3b\"}\n\nPOST /step\n200 -> StepResponse\n422 -> {\"error\":{\"code\":\"invalid_request\", \"message\":\"...\"}}\n422 -> {\"error\":{\"code\":\"invalid_proposal\", \"message\":\"...\"}}\n502 -> {\"error\":{\"code\":\"model_unavailable\", \"message\":\"...\"}}\n502 -> {\"error\":{\"code\":\"invalid_model_output\", \"message\":\"...\"}}\n504 -> {\"error\":{\"code\":\"inference_timeout\", \"message\":\"...\"}}",
+        nuances: [
+          ["Stateless is not exactly-once", "The service does not maintain sessions, deduplicate request/action IDs, persist a queue, or remember execution outcomes. Generating UUIDs establishes identity/correlation, not replay protection."],
+          ["Health is a shallow dependency check", "Model readiness checks whether /api/tags contains the configured name. It does not load the weights, perform image inference, or guarantee a bounded future response. Model absence still returns HTTP 200 with model_ready=false."],
+          ["CORS is not authentication", "The middleware controls browser cross-origin access. It is not an authorization system or a substitute for loopback binding, authentication, rate limiting, and deployment controls."],
+          ["Timeout semantics need precision", "The configured HTTPX timeout applies to network timeout phases, not an explicitly enforced whole-mission deadline. Concurrent async requests can still contend for the same model/GPU; there is no application semaphore or admission queue."]
+        ],
+        alternatives: [
+          ["WebSocket / SSE progress", "For server-side execution or useful long-running progress events.", "More connection/reconnection state. The current one-decision HTTP request is simpler; Ollama output is not streamed."],
+          ["Background worker and bounded queue", "For multiple users, expensive inference, cancellation tracking, or retries.", "Adds job persistence, backpressure, idempotency, and status endpoints."],
+          ["Backend authoritative simulation", "When shared world state or untrusted clients matter.", "Stronger consistency and access control, but more infrastructure and real-time transport requirements."]
+        ],
+        questions: [
+          ["Why async FastAPI and HTTPX?", "The API mostly waits for Ollama. Async I/O lets the server handle other work while waiting, and a shared client reuses connections. It does not increase GPU inference capacity or move synchronous validators off the event loop.", "Add concurrency limits based on measured model capacity, not just worker count."],
+          ["Why use create_app and Protocol?", "They make the model boundary replaceable without real Ollama in contract tests. The Protocol describes the required methods, while the application factory selects real or injected dependencies. Lifespan provides an explicit cleanup point.", "Dependency injection is for testability and substitution, not an extra network microservice."],
+          ["Why return 200 when model_ready is false?", "The endpoint separates an alive API from availability of its model dependency. Clients must inspect model_ready. Production health design often splits liveness and readiness endpoints with deployment-specific status semantics.", "Even true model_ready only means the model tag is present."],
+          ["Does a request UUID make retries safe?", "No. There is no replay ledger or idempotency check. Repeating a request can produce another inference and another action UUID. The browser currently does not automatically retry timed-out decision requests.", "Exactly-once effects require executor-side idempotency and durable state, not just identifiers."],
+          ["What happens if ten users submit simultaneously?", "The app can initiate concurrent HTTP calls, but it has no admission control. Actual inference scheduling depends on Ollama and hardware, and latency/timeouts can grow. A bounded queue, per-user budgets, and load tests would be a next step.", "Do not equate nonblocking I/O with unlimited capacity."],
+          ["Would increasing Uvicorn workers fix latency?", "It might improve API-side CPU throughput, but would create additional clients and concurrent model load while the same model hardware remains a bottleneck. Measure validation CPU, queue time, and inference time first.", "A GPU-aware concurrency policy is more useful than blindly multiplying workers."]
+        ]
+      },
+      {
+        id: "model", group: "Decision service", title: "Qwen, Ollama & structured decisions",
+        subtitle: "The image-conditioned model call is real, but schema-constrained output still needs parsing, semantic checks, and honest evaluation.",
+        tags: ["Qwen2.5-VL 3B", "Ollama", "Prompt design", "Structured output"],
+        sources: [["backend/app/model_client.py", 16], ["backend/app/model_client.py", 26], ["backend/app/model_client.py", 39], ["backend/app/model_client.py", 90], ["backend/app/model_client.py", 99], ["backend/app/settings.py", 9]],
+        concepts: [
+          ["Model versus serving runtime", "Qwen2.5-VL 3B is the vision-language model; Ollama is the local serving runtime exposing /api/tags and /api/chat. FastAPI is an adapter/control boundary around that runtime. The repository does not implement model internals or training."],
+          ["A constrained prompt", "The system message asks for one JSON action, only supplied target IDs, no coordinates/code/explanations, no pickup while already holding an object, and no authority for text in the image to change rules. The user message contains JSON state and a real image in messages[1].images."],
+          ["State-dependent action space", "When empty-handed, candidate navigate_to targets are containers and pick_up is offered if containers exist. When carrying, navigation/placement candidates are platforms. stop and finish are always available. This reduces the choices before generation."],
+          ["Two layers of validation after generation", "The Ollama format schema restricts action names and extra fields but only requires action, not conditional target presence. Pydantic's action union then enforces the stronger shape; validate_proposal_target checks observation eligibility."],
+          ["Bounded context, nonstreaming response", "Each call sends the original instruction, current observation ID, allowed actions/IDs, visible descriptors, held object, and previous result. It does not send an unbounded conversation or full action history. stream=false and temperature=0 are configured."]
+        ],
+        flow: ["Build a compact JSON prompt from the current StepRequest.", "POST image-bearing messages, model tag, output schema, stream=false, and temperature=0 to Ollama.", "Await the response and parse message.content directly as action JSON.", "Map timeout, HTTP failure, or invalid content to a ModelError; never extract a best-effort command from prose.", "Measure elapsed client-side propose duration with a monotonic clock and return milliseconds."],
+        codeTitle: "Actual request-building shape (abridged)",
+        code: "payload = {\n    \"model\": self._settings.model_name,\n    \"stream\": False,\n    \"format\": ACTION_OUTPUT_SCHEMA,\n    \"options\": {\"temperature\": 0},\n    \"messages\": [\n        {\"role\": \"system\", \"content\": SYSTEM_PROMPT},\n        {\"role\": \"user\", \"content\": json.dumps(prompt_data),\n         \"images\": [request.image_base64]},\n    ],\n}\n# Raw message content must parse as the action union:\nproposal = ACTION_ADAPTER.validate_json(content)",
+        nuances: [
+          ["Temperature zero is not a correctness guarantee", "It reduces sampling variation but does not guarantee semantic correctness or bit-for-bit reproducibility across runtime/model/hardware changes."],
+          ["Latency is end-to-end within propose", "inference_ms includes the model HTTP round trip, potential runtime queue/loading, and parsing. It is not isolated GPU compute time and excludes browser capture, API validation before propose, and rover execution."],
+          ["Documented compatibility is empirical", "README records Qwen2.5-VL 3B as verified, cold calls around 29-106 seconds, and a Llama 3.2 Vision architecture incompatibility in the tested Ollama setup. These are historical local observations, not universal model benchmarks."],
+          ["Prompt rules are not an execution sandbox", "Even a structured, schema-valid action can select the wrong object or request finish too early. Controller preconditions and objective checks still matter. Raw instructions and images are not normally written to a durable trace."],
+          ["Evaluation is confounded by rewriting", "The current UI can correct or replace the model's target before execution. Measure raw target accuracy separately from effective delivery success, or you may credit the model for rule-based behavior."]
+        ],
+        alternatives: [
+          ["A different local vision model", "If accuracy, latency, context, memory, or runtime compatibility is better on measured tasks.", "Must validate actual image support and action quality; do not silently substitute a text-only model."],
+          ["Hosted vision API", "When stronger models or managed compute justify it.", "Adds network dependence, privacy/consent requirements, cost, credentials, and provider-specific contracts."],
+          ["Detector + symbolic planner", "For a narrow domain with reliable object categories and explicit tasks.", "More modular and measurable, but less flexible language/visual reasoning and more hand-designed interfaces."]
+        ],
+        questions: [
+          ["What is the difference between Ollama and Qwen?", "Ollama serves and runs models; Qwen2.5-VL is the selected model. The adapter sends messages and image data to Ollama's API. FastAPI is neither the model nor a training service.", "Explain runtime compatibility separately from a model's nominal capability."],
+          ["Does structured output eliminate hallucination?", "No. It narrows syntax and action names. It does not establish that the object is the requested one, that the scene metadata is correct, or that execution is safe. Pydantic, semantic allowlists, and browser preconditions provide additional checks.", "The generation schema is also weaker than the final discriminated union."],
+          ["Why send previous_action_result?", "It gives the next decision feedback about execution rather than only the original instruction and image. This can support recovery or progression with bounded context. It is just the previous result, not a durable history or an explicit planner memory.", "A longer history can help loops but increases context size and stale-state risk."],
+          ["How would you compare models fairly?", "Pin model/runtime/prompt versions, randomize layouts and color-to-ID mappings, keep intended answers out of the decision path, retain failed trials, and report raw target/action accuracy, delivery rate, invalid outputs, and latency distributions. Separate warm and cold runs.", "Disable or separately score the current target override when measuring visual selection."],
+          ["What does a 504 tell the user?", "The backend reports an inference timeout and returns no fallback command. It does not prove that Ollama stopped computing immediately. The browser should fail visibly or let the user restart explicitly, not replay movement blindly.", "A future job/cancellation protocol would be needed to manage server-side work explicitly."],
+          ["Why keep the model away from coordinates?", "Symbolic IDs make the action space narrower, auditable, and decoupled from scene geometry. The deterministic controller can plan and check range. This trades unconstrained model flexibility for predictable skills.", "An unknown-object environment would first need a grounded object identity/pose interface."]
+        ]
+      },
+      {
+        id: "navigation", group: "Execution & consistency", title: "Grid navigation & movement",
+        subtitle: "The rover follows a deterministic four-neighbor breadth-first search, not an A* planner or physics-based driving model.",
+        tags: ["BFS", "0.5-unit grid", "Obstacle inflation", "Animation tokens"],
+        sources: [["web/src/world.ts", 26], ["web/src/world.ts", 67], ["web/src/world.ts", 698], ["web/src/world.ts", 779], ["web/src/world.ts", 790], ["web/src/world.ts", 839]],
+        concepts: [
+          ["Discrete search space", "findPath maps world X/Z positions onto a 0.5-unit grid. It rounds and clamps start/goal cells to floor limits, then explores four cardinal neighbors. A queue and predecessor Map recover a shortest path in number of grid edges."],
+          ["Collision proxies", "The planner checks hard-coded rectangular obstacles, inflated by 0.38, plus door-state-dependent blocking regions. These are separate from rendered meshes; there is no general mesh collider or physics engine."],
+          ["Interaction approach points", "navigateTo resolves the target ID and computes a point on the robot-to-target direction, offset from the target by 1.18 units for a container or 1.45 for a platform. It does not search multiple approach positions if that point is blocked."],
+          ["Animated segments", "walkSegment turns the robot toward each point and lerps position with smoothstep easing. Duration is max(90 ms, distance / 2.3 * 1000). A movement token is checked on each frame to cancel old paths. It is kinematic animation, not wheel dynamics."]
+        ],
+        flow: ["Convert start and destination to grid cells.", "BFS over unvisited, in-bounds, unblocked cardinal neighbors.", "If no goal is reached, return unreachable_target.", "Backtrack predecessors, reverse the path, and append the exact destination.", "Animate each segment in sequence; exit as cancelled if movementToken changes."],
+        codeTitle: "Planner essence (pseudocode matching the current algorithm)",
+        code: "queue = [start_cell]\nprevious[start_cell] = null\nwhile queue is not empty:\n    cell = queue.shift()\n    if cell == goal_cell: break\n    for neighbor in four_cardinal_neighbors(cell):\n        if inside_grid and not_visited and not_blocked:\n            previous[neighbor] = cell\n            queue.push(neighbor)\n\npath = reverse(backtrack(previous, goal_cell))\npath.push(exact_destination)\n# No heuristic, diagonal moves, dynamics, or continuous collision sweep.",
+        nuances: [
+          ["Shortest on the grid, not in continuous space", "BFS is shortest for unit-cost graph edges. It does not optimize smoothness, turning, energy, or physical travel time. The logical graph algorithm is O(V+E), but JavaScript Array.shift can add overhead."],
+          ["The final segment is a limitation", "The exact destination is appended after grid search without a continuous collision check. Clamping also means a grid goal can differ from an out-of-bounds destination. Do not claim collision-perfect navigation."],
+          ["Geometry and proxies can drift", "Visual meshes and hard-coded obstacle rectangles are separately maintained. Inflating by 0.38 is an approximation, not a proven rover footprint bound, especially while carrying."],
+          ["No explicit navigation deadline", "Segment durations are computed, and movement can be cancelled, but there is no navigation or whole-macro timeout. Background-tab animation throttling can lengthen wall-clock execution."]
+        ],
+        alternatives: [
+          ["A* with Manhattan heuristic", "For larger four-neighbor uniform-cost grids.", "Explores fewer nodes toward a goal, but requires heuristic/priority-queue logic; still inherits grid/proxy limitations."],
+          ["Navmesh and path smoothing", "For larger authored environments and more natural routes.", "Requires navigation geometry/baking and agent-size handling; avoids some grid stair-stepping."],
+          ["Physics-aware local controller", "When velocity, acceleration, collisions, and moving obstacles matter.", "More realism and complexity; demands trajectory tracking, replanning, and stronger tests."]
+        ],
+        questions: [
+          ["Is the pathfinder A*?", "No. It is four-neighbor BFS with a FIFO queue and predecessor map, without a heuristic or priority queue. It finds a shortest grid-edge path in a uniform-cost graph when the goal is reachable.", "Do not infer an algorithm from the general phrase 'pathfinder'."],
+          ["Why inflate obstacles?", "The rover occupies area, so checking only its center against exact obstacle rectangles would permit clipping. Inflation approximates clearance. The chosen value is not derived from a full swept footprint and does not guarantee safety while turning or carrying.", "A configuration-space obstacle model would make the clearance assumptions explicit."],
+          ["What happens when the direct approach point is blocked?", "The BFS may return no route to that chosen cell. navigateTo does not search around the target for alternative interaction points. An improved planner would sample or predefine valid approach poses and choose a reachable one.", "A target can be conceptually reachable even if one offset is not."],
+          ["How would you test path correctness?", "Extract the grid planner from rendering and test reachable/unreachable cases, door states, boundaries, proxy clearance, and the exact final segment. Assert every returned segment respects the chosen collision model, not just that a path exists.", "Also test the mismatch between rendered obstacle geometry and planner proxies."],
+          ["How is speed determined?", "Each segment gets duration based on distance and nominal 2.3 units/s, with a 90 ms minimum. Smoothstep easing accelerates/decelerates within every segment, so instantaneous speed is not constant and grid corners may look stop-start.", "A continuous path follower could separate speed profile from grid waypoint spacing."],
+          ["What would A* fail to fix?", "It would not fix inaccurate collision proxies, unsafe exact-destination segments, unsupported approach poses, missing deadlines, or lack of dynamic obstacle handling. A faster search is not a complete navigation redesign.", "Explain correctness assumptions before optimizing search performance."]
+        ]
+      },
+      {
+        id: "manipulation", group: "Execution & consistency", title: "Pick, carry & delivery verification",
+        subtitle: "A high-level pickup can launch a deterministic delivery skill; primitive manipulation is range-checked scene-graph state mutation.",
+        tags: ["Skill macro", "Scene graph parenting", "State invariants", "Verification"],
+        sources: [["web/src/world.ts", 617], ["web/src/world.ts", 631], ["web/src/world.ts", 647], ["web/src/world.ts", 736], ["web/src/world.ts", 755], ["web/src/main.ts", 247]],
+        concepts: [
+          ["Primitive pickup", "pickUp requires empty hands, an available container, and distance at most 1.65. It marks the target held, sets carryId, reparents the container under the rover, and sets a carry-local position (0, 1.58, 0.82). No articulated gripper or contact dynamics are simulated."],
+          ["Primitive placement", "placeOn requires a held object, a platform target, and distance at most 1.95. It reparents the container into the scene, positions it at the platform with y=0.52, marks delivered/deliveredTo, and clears carryId."],
+          ["The high-level skill", "executePickAndPlace approaches a selected container if needed, picks it up, optionally traverses table waypoints, approaches the chosen platform (including door handling), and places it. Each phase reports progress and stops on a failed/cancelled result."],
+          ["Two kinds of success", "An ExecutionResult says whether a primitive or macro succeeded. The mission only displays VERIFIED when isDelivered(expectedTargetId, expectedPlatformId) is true. A finish proposal without that state is rejected as premature_finish and fed back as the previous result."]
+        ],
+        flow: ["Validate selected container availability and carry compatibility.", "Navigate into pickup range if not already holding that container.", "Attach the container to the rover and mark held.", "Execute an optional table-side route and approach the requested platform.", "Place the object, record destination, and release carry state.", "Check expected object/destination state before labeling the mission verified."],
+        codeTitle: "Core state transitions",
+        code: "available\n  -- pickUp (empty hands, distance <= 1.65) --> held\n  -- placeOn (platform, distance <= 1.95) --> delivered\n\npickUp:\n  carryId = target.id\n  robot.add(target.root)\n\nplaceOn:\n  scene.add(carried.root)\n  carried.status = \"delivered\"\n  carried.deliveredTo = platform.id\n  carryId = null\n\nVERIFY: target.status === \"delivered\"\n        && target.deliveredTo === expectedPlatformId",
+        nuances: [
+          ["A skill, not an atomic transaction", "The macro has sequential phases but no rollback. A failure after pickup can leave the rover carrying an object. Resuming the same target is supported, but other recovery/reset workflows are limited."],
+          ["One slot without occupancy protection", "Placement uses one fixed platform pose. There is no check that a platform already contains another container, so successive deliveries can overlap."],
+          ["Delivery check is logical", "isDelivered uses controller-maintained status and destination. It does not independently measure containment, confirm every planned invariant, or test whether another container was delivered unintentionally."],
+          ["Action semantics differ by caller", "Manual pick_up calls the primitive and can fail out of range. Mission-level pick_up is a target request that launches the larger delivery macro. Explain the dispatcher, not only the action name."]
+        ],
+        alternatives: [
+          ["One model decision per primitive", "For more frequent visual feedback and flexible recovery.", "More model calls, latency, and chance of loops; current high-level skills amortize slow inference."],
+          ["Behavior tree / resumable skill", "For explicit phase state, pause/resume, retries, and recovery.", "More structure, but easier to test than growing an implicit async macro."],
+          ["Physics-based grasp and placement", "For realism or robot-transfer research.", "Requires constraints, collision/contact handling, grasp planning, and a stronger success sensor."]
+        ],
+        questions: [
+          ["Does the model physically pick up the container?", "No. It can select a symbolic action/target, then TypeScript checks preconditions and changes scene graph parenting/state. The rover carry animation is deterministic; there is no learned grasp controller.", "The mission dispatcher can also rewrite the selected target."],
+          ["Why check range in the browser if the API saw a range flag?", "The browser owns the current state and may have moved since capture. The API's range flag is only submitted metadata, and a high-level pickup intentionally allows approach. The actual manipulation must check current distance.", "This is a time-of-check versus time-of-use distinction."],
+          ["What happens if navigation fails after pickup?", "The macro returns the failure and the held container remains attached. There is no rollback to its original position. A later mission for that same container can continue from carrying state; a different target is rejected while holding it.", "Describe explicit recovery rather than calling the macro atomic."],
+          ["Why not trust finish?", "A model can be wrong or premature. The browser checks expected target/destination state; if incomplete, it records a failed previous result with premature_finish and can ask again within the observation bound.", "The current check is independent of the model but not independent of controller-maintained flags."],
+          ["What is missing from platform placement?", "There is no occupancy reservation, alternative placement slot, or collision/geometry containment test. placeOn writes to one platform pose and marks delivered. A generalized implementation needs capacity, occupancy, and physical verification.", "Multiple deliveries should be a focused regression scenario."],
+          ["Which invariants would you test?", "At most one held object; carryId agrees with target status and parent; only available containers can be picked up; deliveredTo agrees with the platform; failed range checks do not mutate state; cancel/failure leaves carry state consistent.", "These are high-value controller tests that the current backend-only suite does not prove."]
+        ]
+      },
+      {
+        id: "routes", group: "Execution & consistency", title: "Room 2, doors & table-side routes",
+        subtitle: "Room choice and route constraints are deterministic features layered on the fixed scene, not model-planned spatial reasoning.",
+        tags: ["Regex task parsing", "Waypoints", "Door animation", "Fixed layout"],
+        sources: [["web/src/main.ts", 139], ["web/src/main.ts", 153], ["web/src/world.ts", 681], ["web/src/world.ts", 698], ["web/src/world.ts", 813]],
+        concepts: [
+          ["Destination is parsed locally", "Room-2 phrases such as 'second room', 'room 2', 'delivery_02', or 'other room' select delivery_02. Other instructions default to delivery_01. No model-defined destination geometry is accepted."],
+          ["Explicit table-side phrases", "A regex recognizes north/south/east/west side of the table. North means negative Z; south positive Z; east positive X; west negative X. These directions are world axes, not camera-relative directions."],
+          ["Hard-coded route waypoints", "North/south routes use z=-1.8/3.3 and x=-2.3 to 2.3. East/west use x=4.3/-2.3 and z=-1.8 to 3.3, reversing order when the rover starts south of z=0.75. BFS connects each waypoint."],
+          ["Door state changes the planner", "For a destination beyond x=7.15 with the door closed, navigateTo first walks to (6,0,0), animates the door by 90 degrees over 800 ms, then sets doorOpen. Different hard-coded blocked regions model the closed and swung-open door."]
+        ],
+        flow: ["Parse expected platform and optional table side from the instruction.", "Pick up or resume carrying the expected container.", "Visit the selected table route's fixed waypoints, if any.", "For a room-2 target, approach the door and animate opening if closed.", "Replan with the open-door blocking region and approach the platform.", "Place and verify the same expected platform ID."],
+        codeTitle: "Deterministic route constants",
+        code: "north: (-2.3, -1.8) -> ( 2.3, -1.8)  // (x, z)\nsouth: (-2.3,  3.3) -> ( 2.3,  3.3)\nwest:  (-2.3, -1.8) -> (-2.3,  3.3)\neast:  ( 4.3, -1.8) -> ( 4.3,  3.3)\n\nRoom 2:\n  approach door at (x=6, z=0)\n  animate rotation.y: 0 -> PI/2 over 800 ms\n  doorOpen = true\n  navigate to delivery_02 approach point",
+        nuances: [
+          ["Route intent is not geometrically certified", "The controller visits waypoints associated with a named side; it does not prove a topological route constraint for every segment or validate the actual traversed side independently."],
+          ["The door is scripted", "There is no model open_door action, hinge physics, dynamic swept collision test, or close-door workflow. Cancellation during opening resets rotation and leaves doorOpen false."],
+          ["This is layout-coupled policy", "The route constants and door proxies assume the current table and room geometry. Moving the table or changing dimensions does not automatically update those constraints."],
+          ["Planning document lag", "Early scope in PLAN.md lists multiple rooms as out of scope, while the current source and README implement a second room. Use source behavior when discussing present capabilities."]
+        ],
+        alternatives: [
+          ["Semantic waypoint graph", "When the scene grows beyond fixed coordinates.", "A maintainable graph of rooms, doors, and affordances adds authoring and consistency work."],
+          ["Constraint-aware path planning", "When 'pass north of table' must be guaranteed.", "Requires formalizing the constraint and verifying the path, not merely visiting convenient waypoints."],
+          ["Door as an explicit skill/action", "When the model should choose interaction order or handle unfamiliar doors.", "Adds observation/action schema, preconditions, failures, and evaluation cases."]
+        ],
+        questions: [
+          ["Does the model decide how to open the door?", "No. The browser detects a target beyond the partition and runs a scripted approach/open sequence. The model action space has no open_door command.", "It is a deterministic environmental skill in navigateTo."],
+          ["What does north mean if I rotate the camera?", "It remains negative world Z. OrbitControls changes the view, not the coordinate convention. The parser does not interpret camera-relative directions.", "An interview demo should explain the convention before showing route constraints."],
+          ["Is going through a north waypoint enough to prove a north route?", "Not generally. The planner connects fixed points, and intermediate routes can depend on obstacles. A formal constraint needs path-level checking or a planner that encodes the required side/topology.", "The current feature is practical for the authored scene, not a general language-to-path solver."],
+          ["What if Stop occurs while the door is opening?", "The animation checks movementToken. A mismatch resets the door rotation, returns a cancelled result, and does not set doorOpen=true. Already opened doors remain open when later movement is cancelled.", "Test cancellation just before and after the animation completes."],
+          ["How would you support a third room?", "Avoid adding scattered x-thresholds and regexes. Introduce room/platform identities and a connectivity graph with door skills, generate collision data from the scene, and validate destination parsing. Keep VLM and controller responsibilities explicit.", "First confirm that the product needs general multi-room planning rather than one more demo route."]
+        ]
+      },
+      {
+        id: "cancellation", group: "Execution & consistency", title: "Cancellation, stale work & consistency",
+        subtitle: "Three different cancellation mechanisms protect different layers. None alone implies that model computation or all effects have been undone.",
+        tags: ["AbortController", "Run generation", "movementToken", "Race conditions"],
+        sources: [["web/src/main.ts", 153], ["web/src/main.ts", 214], ["web/src/main.ts", 288], ["web/src/main.ts", 306], ["web/src/world.ts", 622], ["web/src/world.ts", 839]],
+        concepts: [
+          ["Abort the browser request", "AbortController's signal is passed to fetch. Stop aborts that request and treats AbortError separately from link failures. This stops browser waiting; it is not a backend/Ollama cancellation protocol."],
+          ["Invalidate old mission work", "activeRun is incremented when starting or stopping. Await continuations compare their captured run generation, and finally only restores UI state if still current. This prevents an old mission's cleanup from overwriting a new one."],
+          ["Reject mismatched decisions", "Responses must match session_id, request_id, and observation_id. A response with the wrong identity is rejected before dispatch. Correlation is a freshness check within this tab's flow, not persisted deduplication."],
+          ["Stop local animation", "stopMovement increments movementToken. walkSegment and door animation check the token on each frame and return cancellation. Already completed pickup/placement mutations are not rolled back; a held object stays attached."]
+        ],
+        flow: ["User presses Stop while a mission is active.", "Increment activeRun so old continuations become obsolete.", "Abort the fetch if still waiting and increment movementToken to invalidate local animations.", "Restore mission controls and show a cancelled event.", "Late work is ignored by generation/correlation checks; server-side inference may continue."],
+        codeTitle: "Actual cancellation layers (abridged)",
+        code: "function stopMission(): void {\n  if (!running) return;\n  activeRun += 1;\n  currentAbort?.abort();\n  currentAbort = null;\n  world.stopMovement();\n  running = false;\n  // Restore controls and show cancellation.\n}\n\nstopMovement(): void {\n  this.movementToken += 1;\n}\n\n// Every animated movement segment checks:\nif (token !== this.movementToken) { resolve(false); return; }",
+        nuances: [
+          ["Cancellation is cooperative", "Animation stops at its next frame check, not by preempting arbitrary JavaScript. A synchronous scene mutation cannot be interrupted halfway by a click in the same event loop."],
+          ["No durable command deduplication", "Action IDs are not stored in an executed-action ledger. A design requirement to reject duplicate manipulation is not the same as a current implementation of exactly-once effects."],
+          ["No single transaction token for every skill phase", "The macro calls multiple methods that establish/check movement tokens locally. It is not represented as a persisted atomic task with rollback. Boundary races and overlapping manual commands deserve focused tests."],
+          ["Recover state, do not invent success", "A stopped rover can still be carrying an object. The scene persists in the tab; reloading reconstructs the world. The UI should not equate cancellation with delivery or automatically drop an object."]
+        ],
+        alternatives: [
+          ["One executor queue + mission token", "To serialize manual and model actions and check cancellation at every skill boundary.", "A small local command processor can be sufficient before introducing distributed infrastructure."],
+          ["Durable job and idempotency ledger", "For remote execution, retries, reconnects, and multiple clients.", "Requires storage, ownership, replay rules, and a clear definition of committed effects."],
+          ["Explicit recovery states", "When failed/cancelled delivery should resume, return, or safely release cargo.", "More UX and controller logic, but clearer than implicit state after a partial macro."]
+        ],
+        questions: [
+          ["Why do you need both AbortController and activeRun?", "AbortController cancels browser networking. activeRun protects local continuations and cleanup from obsolete missions, including work that has already returned or is executing. They solve different freshness problems.", "movementToken handles animation cancellation, a third layer."],
+          ["Does Stop stop the GPU immediately?", "Not necessarily. The repository does not explicitly propagate cancellation through FastAPI to an Ollama job. The browser stops waiting and ignores obsolete decisions, but inference may continue using resources.", "A server job API with supported cancellation and acknowledgments would be a separate feature."],
+          ["What state remains when stopping while carrying?", "The container remains attached and carryId stays set. Movement stops cooperatively; there is no automatic drop or rollback. A later mission can continue for the same target, while a different expected container is rejected.", "Recovery should preserve consistent state before optimizing convenience."],
+          ["What if an old request completes during a new mission?", "Correlation IDs and the activeRun generation prevent it from being used by the current mission path. The guarded finally block also prevents obsolete cleanup from resetting the new mission's controls.", "These protections are local; they do not form a backend session store."],
+          ["How would you test cancellation races?", "Test during inference, between response and dispatch, on each movement segment, during door opening, immediately after pickup, and near placement. Start a new mission after Stop and assert that old work cannot move it or reset its UI.", "Also test rapid manual actions because they are not fully serialized."],
+          ["Can you promise exactly-once delivery?", "No. UUIDs and current-state preconditions help identify and reject some invalid repeats, but there is no durable idempotency ledger or atomic executor protocol. Promise the implemented local checks, not a distributed guarantee.", "For physical effects, define recovery for the ambiguous 'executed but acknowledgment lost' case."]
+        ]
+      },
+      {
+        id: "testing", group: "Engineering practice", title: "Testing & trustworthy evaluation",
+        subtitle: "The backend contract has a fast automated suite. Controller behavior and model capability require different evidence.",
+        tags: ["22 passing backend tests", "pytest", "HTTPX transports", "Evaluation design"],
+        sources: [["backend/tests/test_api.py", 14], ["backend/tests/test_model_client.py", 29], ["backend/tests/test_schemas.py", 47], ["PLAN.md", 345], ["README.md", 84]],
+        concepts: [
+          ["Schema tests", "Parametrized tests accept all five actions and reject unknown/extra fields. Additional tests cover target allowlists/categories, held-object preconditions, intentional out-of-range high-level pickup, and a truncated PNG. Parametrization means test cases outnumber test function definitions."],
+          ["API tests without a live server", "FakeModel is injected into create_app. HTTPX ASGITransport exercises endpoints in process, with the lifespan explicitly entered. Tests check health/readiness distinction, CORS, correlation/action ID, invalid target, timeout mapping, and invalid image requests."],
+          ["Model adapter tests without a real model", "HTTPX MockTransport inspects the actual outbound payload and returns controlled JSON. Tests prove that a real image field, schema, state-dependent choices, and temperature setting are sent. They do not prove Qwen's visual reasoning."],
+          ["Observed baseline and coverage limits", "The existing backend suite was run for this guide: 22 passed. The repository has no checked-in browser/controller automated test suite in the inspected source tree. README/PLAN record historical browser/manual checks, which are not equivalent to repeatable regression tests."]
+        ],
+        flow: ["Run contract and transport tests using controlled fake responses.", "Run TypeScript checking and the Vite production build.", "Add deterministic controller tests with no model or renderer where possible.", "Run browser integration scenarios for UI, capture, manual commands, and Stop.", "Run separate real-model trials across varied layouts/mappings, with raw and effective decisions recorded.", "Report failures and latency, not only a successful demonstration."],
+        codeTitle: "Existing validation commands (PowerShell, repository root)",
+        code: "Push-Location backend\n..\\.venv\\Scripts\\python.exe -m pytest -q\nPop-Location\n\nPush-Location web\nnpm run build\nPop-Location\n\n# Backend suite observed while preparing this guide:\n# 22 passed\n# Tests use fake/model transports, not a running GPU model.",
+        nuances: [
+          ["A mock can establish a boundary, not a model capability", "The adapter test verifies payload construction and parsing with known responses. A uniformly blue 2x2 test image is a contract fixture, not evidence that the actual scene is understood."],
+          ["Planned evaluation is not achieved reliability", "PLAN.md proposes at least 10 trials over at least three layouts and an initial 8/10 target. It does not establish that such a study has been completed."],
+          ["Avoid evaluator leakage", "The intended target should be held outside the decision path. The current expectedTarget parser both selects/rewrites actions and defines the verification target, which confounds raw model evaluation."],
+          ["Highest-value missing regressions", "Add parser ambiguity/default cases, response-shape validation, cancellation races, command overlap, platform occupancy, path final-segment safety, and image boundary tests. Do not mistake every implemented limit for an existing test of that limit."]
+        ],
+        alternatives: [
+          ["Pure planner/state-machine tests", "For fast, deterministic coverage of controller invariants.", "Requires extracting logic from the renderer, but avoids fragile pixel-driven assertions."],
+          ["Playwright end-to-end tests", "For interaction, layout, capture, and browser/API integration.", "More setup and timing sensitivity; use mocked model responses for regression stability."],
+          ["Seeded real-model benchmark", "For capability, reliability, and latency claims.", "Slower and hardware-dependent; preserve model/prompt/runtime versions and failed trials."]
+        ],
+        questions: [
+          ["What do the 22 passing tests prove?", "They prove the covered schema, API, and adapter behaviors under controlled fixtures. They do not prove navigation correctness, browser race freedom, visual grounding accuracy, or successful real-model inference across layouts.", "State exactly which layer your evidence covers."],
+          ["Why ASGITransport and MockTransport?", "ASGITransport sends HTTP requests directly into the FastAPI app without binding a port. MockTransport intercepts outbound HTTPX model calls. Together with FakeModel they isolate the boundaries and make tests fast and deterministic.", "The tests explicitly enter app lifespan so cleanup behavior is exercised."],
+          ["How would you detect image-independent behavior?", "Randomize color-to-ID assignments and positions, compare raw targets to ground truth, and use image ablations under a controlled protocol. Disable target rewriting for that metric or score it separately.", "Success after a deterministic override is not evidence that the image was necessary."],
+          ["Which metrics would you report?", "Raw target/action accuracy, validated-proposal rate, wrong-object rate, end-to-end verified delivery rate, cancellations, failure categories, per-decision latency, full mission duration, and warm/cold differences. Report counts and sample size.", "Separate model errors from parser, planner, transport, and executor failures."],
+          ["What is the most useful next test?", "For reliable execution, a cancellation/rapid-command regression and carry-state invariant tests are high value. For the project's visual-intelligence claim, a changed color-to-ID test without target rewriting is essential. The choice depends on the claim being defended.", "Prefer tests that would fail on a concrete problematic behavior over tests that restate constants."],
+          ["How would you make demonstrations repeatable?", "Use a known reset state, seeded layouts, versioned prompts/models, fixed capture framing, recorded raw/effective proposals, and a reproducible task list. Keep real-model trials distinct from mocked regression runs.", "There is currently no implemented deterministic reset/seed UI beyond reconstructing the page's fixed world."]
+        ]
+      },
+      {
+        id: "operations", group: "Engineering practice", title: "Build, configuration & live logs",
+        subtitle: "Three local services, two language ecosystems, and intentionally lightweight observability.",
+        tags: ["Vite / npm", "Python .venv", "Environment config", "Logging limits"],
+        sources: [["web/package.json", 1], ["web/tsconfig.json", 1], ["backend/pyproject.toml", 1], ["backend/app/settings.py", 9], ["web/src/main.ts", 40], ["README.md", 36]],
+        concepts: [
+          ["Frontend toolchain", "Node.js 20.19+ and npm support Vite 7 and TypeScript. npm run dev binds Vite to 127.0.0.1; npm run build runs tsc -b then vite build. TypeScript targets ES2022 with strict/noUnused/noFallthrough checks and no JS emit from tsc. Vite bundles to web/dist."],
+          ["Python packaging and runtime", "The backend requires Python 3.12+, uses a repository .venv, and installs as an editable package with setuptools. FastAPI/Pydantic define the API, Pillow checks images, HTTPX handles model I/O, Uvicorn serves ASGI, and pytest is a test extra. There is no requirements.txt-based workflow here."],
+          ["Configuration boundaries", "VITE_API_BASE_URL is frontend build/dev configuration (default http://127.0.0.1:8000). Backend environment variables are OLLAMA_URL, VLM_MODEL, and VLM_TIMEOUT_SECONDS (defaults loopback :11434, qwen2.5vl:3b, and 120). Settings checks an absolute HTTP(S) URL, a nonblank model, and a positive timeout."],
+          ["What logs actually exist", "Uvicorn emits access/startup logs; Ollama emits runtime/request logs; Vite emits dev/build output. The browser event stream keeps only four recent rows. Invalid model output generates a warning with validation details, not a durable full observation/proposal trace."]
+        ],
+        flow: ["Create/install the Python virtual environment and frontend dependencies once.", "Pull the required model and start or reuse Ollama on port 11434.", "Start Uvicorn on 127.0.0.1:8000, then Vite on port 5173.", "Check /health for model_ready and load the browser app.", "Use server output for availability/runtime diagnosis; use the browser event stream for recent execution phases.", "For deployment, build static assets and explicitly design API hosting, configuration, access controls, and model capacity."],
+        codeTitle: "Development commands (three terminals, from repository root)",
+        code: "# 1. Ollama (if not already serving)\n& \"$env:LOCALAPPDATA\\Programs\\Ollama\\ollama.exe\" serve\n\n# 2. Backend\nPush-Location backend\n..\\.venv\\Scripts\\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000\n\n# 3. Browser\nPush-Location web\nnpm run dev -- --port 5173 --strictPort\n\n# Readiness\nInvoke-RestMethod http://127.0.0.1:8000/health",
+        nuances: [
+          ["Dependency ranges versus exact installs", "package.json gives version ranges (Three.js ^0.180.0, TypeScript ^5.9.3, Vite ^7.1.12); package-lock.json records the resolved npm graph. pyproject.toml gives Python dependency ranges without a Python lockfile in this repository."],
+          ["Vite configuration is not a secret store", "VITE_* values are exposed in frontend code. Never put model-provider secrets there. Backend Settings reads environment variables; this source does not automatically load a .env file."],
+          ["Readiness does not warm the model", "A true model_ready is tag availability, not a completed inference. Cold loading can dominate latency. README documents a CPU-only workaround for a tested local runner issue; it is a troubleshooting option, not the default configuration."],
+          ["Current live viewer is session infrastructure", "The terminal viewer opened during development follows server output. It is not an application logging feature checked into the repository. Full instruction text, raw model proposals, images, and correlation-rich traces are not persistently logged by default."],
+          ["Production is not just vite preview", "A production browser build is static assets. CORS still only allows the two default Vite origins; changing the UI host/port requires an intentional backend policy update. There is no checked-in container, CI workflow, or production deployment stack in the inspected tree."]
+        ],
+        alternatives: [
+          ["Structured JSON event logs", "For correlating instruction, request, raw/effective proposal, phase, result, and timings.", "Define retention and redact sensitive instructions/images; avoid logging raw observations indiscriminately."],
+          ["Containerized services + readiness probes", "For reproducible team setup and deployment.", "GPU/model-volume support, host networking, and warmup need explicit handling."],
+          ["CI and dependency locking", "To catch regressions and improve reproducibility.", "Add a small build/test workflow and an appropriate Python lock strategy before broad infrastructure."]
+        ],
+        questions: [
+          ["How do you diagnose API OFFLINE?", "Check whether Uvicorn is listening on 8000 and /health is reachable. If reachable but model_ready=false, inspect Ollama on 11434 and the exact configured model tag. If browser fetch fails while direct HTTP works, inspect API base URL and CORS.", "Separate network, API, model availability, and model inference errors."],
+          ["Where can I see the instruction history?", "There is no durable instruction-history feature. Browser logEvent retains four recent rows and does not create a full trace; server access logs show routes/statuses, not normally full instruction bodies. A live server log viewer does not add application-level audit data.", "Add opt-in structured events with explicit privacy and retention rules if history is required."],
+          ["What changes when VITE_API_BASE_URL changes?", "It changes the URL compiled/served by Vite for browser fetches. It does not reconfigure the Python backend's Ollama URL or its CORS allowlist. Production static assets usually need rebuilding for a changed Vite environment value.", "Keep browser-to-API and API-to-model configuration separate."],
+          ["Why can a model be READY but still slow or fail?", "The readiness check only finds its tag. Weight loading, memory pressure, runtime compatibility, queueing, and actual image inference can still fail. A small opt-in inference smoke test is stronger than a tag check but costs resources.", "Report warmup and cold latency separately."],
+          ["What do you need for public deployment?", "Authentication/authorization, transport security, raw request-size and rate/concurrency limits, a trusted executor model, observability, a production origin policy, and model capacity planning. The local demo deliberately does not implement that deployment architecture.", "CORS alone is not protection for a public inference endpoint."],
+          ["Why is a build not a complete correctness test?", "tsc checks static TypeScript constraints and Vite bundles assets. Neither proves runtime JSON validity, controller invariants, GPU compatibility, or visual grounding. Use builds, unit/contract tests, browser tests, and real-model evaluation for their distinct purposes.", "A successful npm build is necessary packaging evidence, not a robotics success metric."]
+        ]
+      },
+      {
+        id: "evolution", group: "Engineering practice", title: "Trade-offs & the next design",
+        subtitle: "Defend the prototype's deliberate simplicity, then propose improvements that address a real limitation rather than adding technology for its own sake.",
+        tags: ["System design interview", "Prioritization", "Production gaps", "Alternative architectures"],
+        sources: [["PLAN.md", 85], ["PLAN.md", 345], ["PLAN.md", 402], ["web/src/main.ts", 222], ["backend/app/main.py", 49]],
+        concepts: [
+          ["First improve the scientific claim", "Separate raw model proposal, policy decision, and executed action. Remove target rewriting from the model-capability evaluation path, randomize IDs/layouts, and record a reproducible benchmark before claiming robust visual autonomy."],
+          ["Then strengthen local correctness", "Extract parser/planner/skill state from rendering, serialize commands, propagate one cancellation context through every phase, validate responses at runtime, check exact path segments and platform occupancy, and define unsupported-instruction behavior."],
+          ["Scale only after measuring", "For multiple users, decide who owns world state. Keep local simulation if sessions are independent; move execution authority server-side if clients share or control a real resource. Add bounded model admission control before horizontal API scaling."],
+          ["Keep proposed work labeled", "A database, queue, WebSocket, ROS bridge, physics engine, or behavior tree can be useful under specific requirements. None is automatically needed for this fixed-scene single-user local demo, and none should be described as already implemented."]
+        ],
+        flow: ["Name the requirement or observed failure.", "Identify the layer that owns it and the invariant that should hold.", "Choose the smallest design change that fixes the root cause.", "Define a test or metric that could disprove the improvement.", "Measure the cost in latency, complexity, reproducibility, and operational burden.", "Document residual limitations rather than claiming the system is generally solved."],
+        codeTitle: "A proposed architecture for remote/shared execution (not current code)",
+        code: "Client UI\n  -> authenticated observation / task API\n  -> bounded inference queue\n  -> model adapter + validated proposal\n  -> policy / idempotent authoritative executor\n  -> versioned world state + execution events\n  -> client progress stream\n\nCross-cutting: request budgets, cancellation, privacy-aware traces,\n              repeatable evaluation, resource limits, recovery states.",
+        nuances: [
+          ["Avoid cargo-cult microservices", "The existing API/model separation is already a useful boundary. Splitting every helper into another service would add failure modes without proving a need."],
+          ["Real robots change the trust model", "Browser flags and scripted placement are not adequate for physical safety. A real robot needs trusted controllers, state estimation, hardware limits, safety interlocks, and independent validation beyond this project."],
+          ["A stronger model does not fix controller defects", "A model upgrade cannot repair missing occupancy checks, command races, static proxy mismatch, or unclear recovery. Match improvements to the layer that actually owns the problem."],
+          ["Say 'I would' for future work", "Interviewers often test whether candidates distinguish shipped behavior, a design intention, a historical demo, and a proposed improvement. Be precise about all four."]
+        ],
+        alternatives: [
+          ["Keep a local hybrid demo", "When teaching integration and making a reliable constrained demonstration is the priority.", "State the rule-based assistance explicitly and avoid broad autonomy claims."],
+          ["Perception + symbolic planning + skills", "When interpretability, explicit preconditions, and measurable subcomponents matter.", "Requires more interfaces and uncertainty propagation, but gives clear failure attribution."],
+          ["Learned VLA / robotics stack", "For research into real-world or simulator motor policies.", "Different data, training/evaluation, safety, and control requirements; not a drop-in replacement for this code."]
+        ],
+        questions: [
+          ["If you had one day to improve this project, what would you do?", "I would preserve raw versus effective decisions and add a changed-ID/color evaluation, because that tests the central visual-grounding claim. If the immediate goal were demo stability, I would instead prioritize command serialization and cancellation/controller invariants. State the goal before prioritizing.", "Choose a measurable outcome rather than a long technology wish list."],
+          ["If you had one month?", "Build a reproducible benchmark/reset workflow, extract and test planner/skill logic, improve parsing/clarification and runtime contracts, add structured traces, and validate the most important failure modes. Add deployment infrastructure only if team usage requires it.", "Include realistic success criteria and latency/error budgets."],
+          ["How would you support 100 independent users?", "Separate independent session/world state, authenticate clients, cap observation sizes and inference concurrency, measure GPU queueing, and use bounded jobs or replicas based on capacity. More Uvicorn workers alone do not create more model throughput.", "The current browser-local world is naturally session-isolated but not a trusted shared executor."],
+          ["Would you add a database?", "Only for requirements such as persisted tasks, evaluation traces, replay/idempotency, user history, or shared world state. A database is unnecessary for the current ephemeral single-tab scene but becomes useful for durable remote execution.", "Define schema, retention, privacy, and recovery semantics before choosing a storage product."],
+          ["How do you defend the deterministic macro?", "Local model calls are slow, while approach/pickup/delivery have known geometry and preconditions. A skill macro amortizes inference and improves predictability. The cost is less visual feedback within the macro and weaker evidence of general planning.", "Keep high-level skills, but add explicit phases, cancellation, and recovery rather than hiding their existence."],
+          ["What is your most important interview habit?", "Anchor each answer in the code: what is implemented, why that boundary exists, where it fails, how you tested it, and which alternative would fit a changed requirement. Admit the static target override and evaluation limits rather than letting an interviewer discover them first.", "Use: requirement -> mechanism -> invariant -> trade-off -> evidence -> next step."]
+        ]
+      }
+    ];
+
+    const trace = [
+      ["Instruction becomes a constrained task", "Example: 'Pick up the blue container, pass the north side of the table, and deliver it to room 2.' The browser parses object_01, north, and delivery_02 before any inference. This expected target is not sent as a named answer field.", "Browser / deterministic parser"],
+      ["Capture image and observation", "The browser renders and captures a JPEG. It sends IDs, categories, range flags, held object, previous result, and session/request/observation identity. 'Visible' currently means registered and not delivered.", "Browser -> POST /step"],
+      ["Validate the observation", "Pydantic checks JSON structure, IDs, instruction, target uniqueness, base64 bytes, image format and dimensions. Invalid requests return 422 and no model call is needed.", "FastAPI / schemas.py"],
+      ["Ask the vision model", "HTTPX sends the real image and bounded state to Ollama /api/chat with Qwen2.5-VL 3B, a JSON format schema, temperature=0, and stream=false.", "FastAPI -> Ollama -> model"],
+      ["Parse a proposal", "The adapter parses message.content as the strict action union. The API checks target membership/category/carry rules and returns an action UUID with matching correlation IDs.", "Model -> validator -> StepResponse"],
+      ["Apply browser policy", "The browser rejects mismatched IDs or an obsolete run. It then may overwrite the model's target with object_01 or delivery_02. The effective proposal can differ from the raw model result.", "Trust boundary / hybrid override"],
+      ["Run deterministic skills", "A pick_up proposal triggers approach, pickup, the north-table waypoints, room-2 door opening, platform approach, and placement. BFS and scene-state preconditions own execution, not the model.", "Browser / HabitatWorld"],
+      ["Verify or observe again", "The mission checks delivered status and destination for object_01. Successful delivery can end immediately. Other decisions can produce a new observation with the previous result, up to 12 requests. No model finish message can establish success by itself.", "Browser / verification and bounded loop"]
+    ];
+    const glossary = [
+      ["VLM", "Vision-language model: consumes image and text. This project uses its symbolic action proposals."],
+      ["VLA", "Vision-language-action policy: often refers to learned action generation. This repo has no trained low-level VLA policy."],
+      ["ASGI", "The asynchronous Python server/application interface used by Uvicorn and FastAPI."],
+      ["Grounding", "Connecting a language reference or model decision to a real observed object/ID."],
+      ["BFS", "Breadth-first search: FIFO exploration giving shortest edge-count paths in an unweighted graph."],
+      ["Idempotency", "Repeating a request has the same committed effect; UUIDs alone do not implement it."],
+      ["Correlation", "Matching a response to its session/request/observation, distinct from authentication or deduplication."],
+      ["Readiness", "Here: the configured model tag exists. Not proof of a warm, successful inference."],
+      ["Skill / macro", "A deterministic multi-phase action such as approach, pickup, delivery, and placement."],
+      ["Source of truth", "The component whose state is authoritative. Here it is the browser's in-memory world."]
+    ];
+    const moduleById = new Map(modules.map(item => [item.id, item]));
+    const totalQuestions = modules.reduce((count, item) => count + item.questions.length, 0);
+    const article = document.getElementById("article");
+    const nav = document.getElementById("topic-nav");
+    const search = document.getElementById("search");
+    const searchStatus = document.getElementById("search-status");
+    let activeId = "overview";
+    let practicing = false;
+    let traceIndex = 0;
+    const escapeHtml = value => String(value).replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
+
+    function renderNav() {
+      const query = search.value.trim().toLowerCase();
+      let group = "";
+      let matches = 0;
+      nav.innerHTML = modules.map((item, index) => {
+        if (query && !JSON.stringify(item).toLowerCase().includes(query)) return "";
+        matches += 1;
+        const heading = item.group !== group ? `<p class="nav-group eyebrow">${escapeHtml(item.group)}</p>` : "";
+        group = item.group;
+        return `${heading}<a class="topic-link" href="#${item.id}"${item.id === activeId ? ' aria-current="page"' : ""}><span class="num">${String(index).padStart(2, "0")}</span><span>${escapeHtml(item.title)}</span></a>`;
+      }).join("");
+      searchStatus.textContent = query
+        ? `${matches} matching component${matches === 1 ? "" : "s"}. Search filters this list.`
+        : `${modules.length} components / ${totalQuestions} interview questions`;
+    }
+
+    function architectureMarkup(forPrint = false) {
+      const headingId = `${forPrint ? "print-" : ""}architecture-heading`;
+      const node = (id, label, title, description) => `<button type="button" class="diagram-node" data-topic="${id}"><span class="eyebrow">${label}</span><strong>${title}</strong><span>${description}</span></button>`;
+      return `<section class="architecture study-only" aria-labelledby="${headingId}">
+        <h2 id="${headingId}">One system. Three processes.</h2>
+        <p>Click a component to inspect its mechanism, trade-offs, and interview questions.</p>
+        <div class="lane-label eyebrow">Browser / owns the world</div>
+        <div class="diagram-row">
+          ${node("mission", "01 / Intent", "Mission interface", "Instruction parsing, lifecycle, local policy")}
+          ${node("scene", "02 / Observe", "Three.js + registry", "Actual image + symbolic observation")}
+          ${node("manipulation", "06 / Execute", "Controller + verifier", "BFS, pickup, routes, placement, scene state")}
+        </div>
+        <div class="boundary">IMAGE + METADATA &darr; JSON / HTTP &uarr; VALIDATED PROPOSAL<br>No motor commands cross this boundary.</div>
+        <div class="diagram-row">
+          ${node("contract", "03 / Validate", "FastAPI + Pydantic", "Observation checks and target eligibility")}
+          ${node("model", "04 / Infer", "Ollama + Qwen2.5-VL", "Local image-conditioned action proposal")}
+          ${node("api", "05 / Return", "HTTPX + strict parsing", "Correlated action, timing, structured errors")}
+        </div>
+        <div class="loop-caption">Feedback loop: execute &rarr; previous result + fresh image &rarr; next decision. A delivery macro can complete without another VLM call. Browser-side target rewriting is part of the current path.</div>
+      </section>`;
+    }
+
+    function traceMarkup() {
+      const item = trace[traceIndex];
+      return `<section class="card study-only" aria-label="Example request walkthrough">
+        <div class="trace-controls"><span class="eyebrow trace-label">Request walkthrough / <span id="trace-count">${traceIndex + 1} of ${trace.length}</span></span><div class="tools"><button type="button" class="button" id="trace-back"${traceIndex === 0 ? " disabled" : ""} aria-label="Previous walkthrough step">Back</button><button type="button" class="button primary" id="trace-next">${traceIndex === trace.length - 1 ? "Restart" : "Next boundary"}</button></div></div>
+        <div aria-live="polite" aria-atomic="true" id="trace-content"><h3 class="trace-step">${escapeHtml(item[0])}</h3><p>${escapeHtml(item[1])}</p><p class="eyebrow trace-code">${escapeHtml(item[2])}</p></div>
+        <div class="trace-dots" aria-hidden="true">${trace.map((_, index) => `<span${index <= traceIndex ? ' class="active"' : ""}></span>`).join("")}</div>
+      </section>`;
+    }
+
+    function moduleMarkup(item, forPrint = false) {
+      const index = modules.indexOf(item);
+      const idPrefix = forPrint ? "print-" : "";
+      const sourceLinks = item.sources.map(([path, line]) => `<li><a href="https://github.com/rituparnoc-web/da232o-assignment-2/blob/${snapshot}/${path}#L${line}" target="_blank" rel="noopener noreferrer">${escapeHtml(path)}:${line}</a></li>`).join("");
+      const overview = item.id === "overview";
+      return `<article aria-labelledby="${idPrefix}topic-heading-${item.id}">
+        <h1 id="${idPrefix}topic-heading-${item.id}" tabindex="-1">${escapeHtml(item.title)}</h1>
+        <p class="lede">${escapeHtml(item.subtitle)}</p>
+        <div class="chips">${item.tags.map(tag => `<span class="chip">${escapeHtml(tag)}</span>`).join("")}<span class="chip">${item.questions.length} questions</span></div>
+        <div class="practice-banner"><strong>Practice mode.</strong> Answer out loud before opening a question. Use the same buttons to return to the full explanation or pick a random question.</div>
+        ${overview ? architectureMarkup(forPrint) + (forPrint ? "" : `<div id="trace-host">${traceMarkup()}</div>`) : ""}
+        <div class="study-only">
+          <div class="section-heading"><h2>${overview ? "Your interview narrative" : "How this component works"}</h2><span class="eyebrow">Mechanism / ownership</span></div>
+          <div class="cards">${item.concepts.map(([title, text], conceptIndex) => `<section class="card"><span class="eyebrow">${String(conceptIndex + 1).padStart(2, "0")}</span><h3>${escapeHtml(title)}</h3><p${overview && conceptIndex === 0 ? ' class="pitch"' : ""}>${escapeHtml(text)}</p></section>`).join("")}</div>
+          <div class="section-heading"><h2>The execution path</h2><span class="eyebrow">Follow the data</span></div>
+          <div class="card flow-card"><ol class="flow-list">${item.flow.map(step => `<li>${escapeHtml(step)}</li>`).join("")}</ol></div>
+          <div class="section-heading"><h2>${escapeHtml(item.codeTitle)}</h2></div>
+          <pre><code>${escapeHtml(item.code)}</code></pre>
+          <p class="code-caption">Source-linked implementation notes. Examples marked illustrative or pseudocode are explanatory, not copy-paste API payloads.</p>
+          <div class="section-heading"><h2>Nuances worth defending</h2><span class="eyebrow">Where interviews go deeper</span></div>
+          <div class="nuances">${item.nuances.map(([title, text]) => `<section class="nuance"><h3>${escapeHtml(title)}</h3><p>${escapeHtml(text)}</p></section>`).join("")}</div>
+        </div>
+        <div class="section-heading"><h2>Interview questions</h2><span class="eyebrow">Recall / explain / challenge</span></div>
+        ${forPrint ? "" : '<div class="qa-toolbar screen-only"><p>Try your answer first. Open for an answer outline and a deeper angle.</p><button class="button" type="button" id="toggle-answers">Reveal all answers</button></div>'}
+        <div class="questions">${item.questions.map(([question, answer, follow], qIndex) => `<details class="question" id="${idPrefix}q-${item.id}-${qIndex}"${forPrint ? " open" : ""}><summary><span class="q-number">${String(index).padStart(2, "0")}.${qIndex + 1}</span> ${escapeHtml(question)}</summary><div class="answer"><p>${escapeHtml(answer)}</p><p class="follow"><strong>Nuance / follow-up: </strong>${escapeHtml(follow)}</p></div></details>`).join("")}</div>
+        <div class="study-only">
+          <div class="section-heading"><h2>What else could we have done?</h2><span class="eyebrow">Alternatives, not promises</span></div>
+          <div class="table-scroll"><table><thead><tr><th scope="col">Alternative</th><th scope="col">When it fits</th><th scope="col">Trade-off</th></tr></thead><tbody>${item.alternatives.map(row => `<tr>${row.map(cell => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
+          ${overview ? `<div class="section-heading"><h2>Vocabulary checkpoint</h2></div><div class="card"><dl class="glossary">${glossary.map(([term, definition]) => `<div><dt>${escapeHtml(term)}</dt><dd>${escapeHtml(definition)}</dd></div>`).join("")}</dl></div><div class="callout"><strong>A useful answer structure</strong><p>Requirement &rarr; implementation mechanism &rarr; invariant &rarr; trade-off &rarr; evidence &rarr; next improvement. Say "implemented", "documented historically", or "proposed" deliberately.</p></div>` : ""}
+          <div class="section-heading"><h2>Read the implementation</h2><span class="eyebrow">Evidence, not inference</span></div>
+          <ul class="source-list">${sourceLinks}</ul>
+          <p class="source-note">Optional links open the exact source snapshot on GitHub (repository access may be required). The learning material is embedded here and works offline. PLAN.md is cited for intentions; implemented behavior is checked against source. Tests observed during preparation: 22 backend cases passed.</p>
+        </div>
+      </article>`;
+    }
+
+    function updateAnswerButton() {
+      const details = [...article.querySelectorAll(".question")];
+      const button = document.getElementById("toggle-answers");
+      if (button) button.textContent = details.every(item => item.open) ? "Hide all answers" : "Reveal all answers";
+    }
+
+    function renderTrace() {
+      const host = document.getElementById("trace-host");
+      if (host) host.innerHTML = traceMarkup();
+    }
+
+    function selectTopic(id, moveFocus = false) {
+      const item = moduleById.get(id) || modules[0];
+      activeId = item.id;
+      const index = modules.indexOf(item);
+      article.innerHTML = moduleMarkup(item);
+      document.title = `${item.title} / Habitat interview guide`;
+      document.getElementById("breadcrumb").textContent = `Field guide / ${String(index).padStart(2, "0")} / ${item.group}`;
+      document.getElementById("reading-meta").textContent = `${index + 1} of ${modules.length} components`;
+      document.getElementById("bottom-nav").innerHTML =
+        (index > 0 ? `<a class="page-nav" href="#${modules[index - 1].id}"><span>PREVIOUS COMPONENT</span><strong>${escapeHtml(modules[index - 1].title)}</strong></a>` : "<div></div>")
+        + (index < modules.length - 1 ? `<a class="page-nav next" href="#${modules[index + 1].id}"><span>NEXT COMPONENT</span><strong>${escapeHtml(modules[index + 1].title)} &rarr;</strong></a>` : '<a class="page-nav next" href="#overview"><span>RETURN TO THE MAP</span><strong>Architecture overview &rarr;</strong></a>');
+      renderNav();
+      if (moveFocus) {
+        document.getElementById(`topic-heading-${item.id}`).focus({ preventScroll: true });
+        document.getElementById("content").scrollIntoView({ behavior: "instant", block: "start" });
+      }
+    }
+
+    function setPractice(value) {
+      practicing = value;
+      document.body.classList.toggle("practice-mode", value);
+      document.getElementById("practice").setAttribute("aria-pressed", String(value));
+      document.getElementById("practice").textContent = value ? "Full guide" : "Practice mode";
+      article.querySelectorAll(".question").forEach(item => { item.open = false; });
+      updateAnswerButton();
+    }
+
+    function readHash() {
+      const raw = location.hash.slice(1);
+      return moduleById.has(raw) ? raw : "overview";
+    }
+
+    nav.addEventListener("click", event => {
+      const link = event.target.closest("a");
+      if (link && link.hash === location.hash) selectTopic(activeId, true);
+    });
+    document.querySelector(".skip").addEventListener("click", event => {
+      event.preventDefault();
+      const content = document.getElementById("content");
+      content.focus({ preventScroll: true });
+      content.scrollIntoView({ behavior: "instant", block: "start" });
+    });
+    search.addEventListener("input", renderNav);
+    document.addEventListener("keydown", event => {
+      if (event.key === "/" && !event.ctrlKey && !event.metaKey && !event.altKey && !event.target.matches("input,textarea,[contenteditable]")) {
+        event.preventDefault();
+        search.focus();
+      }
+      if (event.key === "Escape" && event.target === search) {
+        search.value = "";
+        renderNav();
+        search.blur();
+      }
+    });
+    article.addEventListener("click", event => {
+      const topic = event.target.closest("[data-topic]");
+      if (topic) {
+        location.hash = topic.dataset.topic;
+        return;
+      }
+      if (event.target.closest("#toggle-answers")) {
+        const details = [...article.querySelectorAll(".question")];
+        const shouldOpen = !details.every(item => item.open);
+        details.forEach(item => { item.open = shouldOpen; });
+        updateAnswerButton();
+      }
+      if (event.target.closest("#trace-next")) {
+        traceIndex = (traceIndex + 1) % trace.length;
+        renderTrace();
+        document.getElementById("trace-next").focus({ preventScroll: true });
+      }
+      if (event.target.closest("#trace-back")) {
+        traceIndex = Math.max(0, traceIndex - 1);
+        renderTrace();
+        const back = document.getElementById("trace-back");
+        (back.disabled ? document.getElementById("trace-next") : back).focus({ preventScroll: true });
+      }
+    });
+    article.addEventListener("toggle", updateAnswerButton, true);
+    document.getElementById("practice").addEventListener("click", () => setPractice(!practicing));
+    document.getElementById("random").addEventListener("click", () => {
+      const pool = modules.flatMap(item => item.questions.map((_, index) => ({ id: item.id, index })));
+      const choice = pool[Math.floor(Math.random() * pool.length)];
+      search.value = "";
+      history.pushState(null, "", `#${choice.id}`);
+      selectTopic(choice.id);
+      setPractice(true);
+      const question = document.getElementById(`q-${choice.id}-${choice.index}`);
+      question.scrollIntoView({ block: "center", behavior: "instant" });
+      question.querySelector("summary").focus({ preventScroll: true });
+    });
+    function preparePrint() {
+      document.getElementById("print-guide").innerHTML = modules.map(item => moduleMarkup(item, true)).join("");
+    }
+    document.getElementById("print").addEventListener("click", () => window.print());
+    window.addEventListener("beforeprint", preparePrint);
+    window.addEventListener("afterprint", () => { document.getElementById("print-guide").replaceChildren(); });
+    window.addEventListener("hashchange", () => selectTopic(readHash(), true));
+    selectTopic(readHash());
+  </script>
+</body>
+</html>

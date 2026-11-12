@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+from datetime import datetime
 from io import BytesIO
 from typing import Annotated, Literal, TypeAlias
 from uuid import UUID
@@ -22,6 +23,25 @@ TargetId: TypeAlias = Annotated[
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+LogValue: TypeAlias = Annotated[str, StringConstraints(max_length=2000)] | int | float | bool | None
+
+
+class ClientEvent(StrictModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+    event: str = Field(pattern=r"^[a-z][a-z0-9_.]{0,63}$")
+    occurred_at: datetime
+    page_id: UUID
+    sequence: int = Field(ge=1)
+    session_id: UUID | None = None
+    request_id: UUID | None = None
+    observation_id: int | None = Field(default=None, ge=0)
+    action_id: UUID | None = None
+    details: dict[Annotated[str, StringConstraints(max_length=64)], LogValue] = Field(
+        default_factory=dict, max_length=32,
+    )
 
 
 class NavigateTo(StrictModel):

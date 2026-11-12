@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import type { ActionProposal, TargetDescriptor } from "./api";
+import { logClientEvent, type ActionProposal, type LogContext, type TargetDescriptor } from "./api";
 
 export interface ExecutionResult {
   status: "succeeded" | "failed" | "cancelled";
@@ -623,19 +623,19 @@ export class HabitatWorld {
     this.movementToken += 1;
   }
 
-  async nudge(dx: number, dz: number): Promise<ExecutionResult> {
+  async nudge(dx: number, dz: number, context: LogContext = {}): Promise<ExecutionResult> {
     const destination = this.robot.position.clone().add(new THREE.Vector3(dx, 0, dz));
-    return this.walkPath(destination);
+    return this.walkPath(destination, context);
   }
 
-  async execute(action: ActionProposal): Promise<ExecutionResult> {
+  async execute(action: ActionProposal, context: LogContext = {}): Promise<ExecutionResult> {
     switch (action.action) {
       case "navigate_to":
-        return this.navigateTo(action.target_id ?? "");
+        return this.navigateTo(action.target_id ?? "", undefined, context);
       case "pick_up":
-        return this.pickUp(action.target_id ?? "");
+        return this.pickUp(action.target_id ?? "", context);
       case "place_on":
-        return this.placeOn(action.target_id ?? "");
+        return this.placeOn(action.target_id ?? "", context);
       case "stop":
         this.stopMovement();
         return { status: "cancelled", message: "Rover stopped." };
@@ -644,7 +644,7 @@ export class HabitatWorld {
     }
   }
 
-  async executePickAndPlace(targetId: string, onPhase: (phase: string) => void, tableSide?: TableSide, platformId = "delivery_01"): Promise<ExecutionResult> {
+  async executePickAndPlace(targetId: string, onPhase: (phase: string) => void, tableSide?: TableSide, platformId = "delivery_01", context: LogContext = {}): Promise<ExecutionResult> {
     const target = this.targets.get(targetId);
     if (!target || target.category !== "container" || target.status === "delivered") {
       return { status: "failed", target_id: targetId, error_code: "unknown_target", message: "Selected container is not available." };
@@ -656,29 +656,30 @@ export class HabitatWorld {
     if (this.carryId !== targetId) {
       if (this.robot.position.distanceTo(target.groundPosition) > 1.65) {
         onPhase(`Approaching ${target.label}`);
-        const approach = await this.navigateTo(targetId);
+        const approach = await this.navigateTo(targetId, undefined, context);
         if (approach.status !== "succeeded") return approach;
       }
       onPhase(`Picking up ${target.label}`);
-      const pickup = await this.pickUp(targetId);
+      const pickup = await this.pickUp(targetId, context);
       if (pickup.status !== "succeeded") return pickup;
     }
 
     if (tableSide) {
       onPhase(`Going around the ${tableSide} side of the table`);
-      const route = await this.goAroundTable(tableSide);
+      const route = await this.goAroundTable(tableSide, context);
       if (route.status !== "succeeded") return route;
     }
 
     onPhase("Approaching delivery platform");
-    const deliveryApproach = await this.navigateTo(platformId, onPhase);
+    const deliveryApproach = await this.navigateTo(platformId, onPhase, context);
     if (deliveryApproach.status !== "succeeded") return deliveryApproach;
 
     onPhase("Placing container on delivery platform");
-    return this.placeOn(platformId);
+    return this.placeOn(platformId, context);
   }
 
-  async goAroundTable(side: TableSide): Promise<ExecutionResult> {
+  async goAroundTable(side: TableSide, context: LogContext = {}): Promise<ExecutionResult> {
+    logClientEvent("rover.table_route", { side }, context);
     let waypoints: THREE.Vector3[];
     if (side === "north" || side === "south") {
       const z = side === "north" ? -1.8 : 3.3;
@@ -689,22 +690,24 @@ export class HabitatWorld {
       if (this.robot.position.z > 0.75) waypoints.reverse();
     }
     for (const waypoint of waypoints) {
-      const result = await this.walkPath(waypoint);
+      const result = await this.walkPath(waypoint, context);
       if (result.status !== "succeeded") return result;
     }
     return { status: "succeeded", message: `Rover passed the ${side} side of the table.` };
   }
 
-  private async navigateTo(id: string, onPhase?: (phase: string) => void): Promise<ExecutionResult> {
+  private async navigateTo(id: string, onPhase?: (phase: string) => void, context: LogContext = {}): Promise<ExecutionResult> {
+    logClientEvent("rover.navigate", { target_id: id }, context);
     const target = this.targets.get(id);
     if (!target || target.status === "delivered") {
       return { status: "failed", target_id: id, error_code: "unknown_target", message: "Target is not available." };
     }
     if (!this.doorOpen && target.groundPosition.x > 7.15) {
       onPhase?.("Approaching room 2 door");
-      const approach = await this.walkPath(new THREE.Vector3(6, 0, 0));
+      const approach = await this.walkPath(new THREE.Vector3(6, 0, 0), context);
       if (approach.status !== "succeeded") return approach;
       onPhase?.("Opening room 2 door");
+      logClientEvent("rover.door_opening", { target_id: id }, context);
       const token = ++this.movementToken;
       const opened = await new Promise<boolean>((resolve) => {
         const start = performance.now();
@@ -721,19 +724,23 @@ export class HabitatWorld {
         };
         requestAnimationFrame(step);
       });
-      if (!opened) return { status: "cancelled", error_code: "cancelled", message: "Door opening cancelled." };
+      if (!opened) {
+        logClientEvent("rover.door_cancelled", {}, context);
+        return { status: "cancelled", error_code: "cancelled", message: "Door opening cancelled." };
+      }
       this.doorOpen = true;
+      logClientEvent("rover.door_opened", {}, context);
     }
     const away = this.robot.position.clone().sub(target.groundPosition).setY(0);
     if (away.lengthSq() < 0.01) away.set(0, 0, 1);
     away.normalize().multiplyScalar(target.category === "platform" ? 1.45 : 1.18);
     const destination = target.groundPosition.clone().add(away);
-    const result = await this.walkPath(destination);
+    const result = await this.walkPath(destination, context);
     if (result.status === "succeeded") return { ...result, target_id: id, message: `Rover reached ${target.label}.` };
     return { ...result, target_id: id };
   }
 
-  private async pickUp(id: string): Promise<ExecutionResult> {
+  private async pickUp(id: string, context: LogContext): Promise<ExecutionResult> {
     if (this.carryId) {
       return { status: "failed", target_id: id, error_code: "already_holding", message: "Rover is already carrying an item." };
     }
@@ -749,10 +756,11 @@ export class HabitatWorld {
     this.robot.add(target.root);
     target.root.position.set(0, 1.58, 0.82);
     target.root.rotation.set(0, 0, 0);
+    logClientEvent("rover.picked_up", { target_id: id, ...this.getAgentCoordinates() }, context);
     return { status: "succeeded", target_id: id, message: `Picked up ${target.label}.` };
   }
 
-  private async placeOn(id: string): Promise<ExecutionResult> {
+  private async placeOn(id: string, context: LogContext): Promise<ExecutionResult> {
     if (!this.carryId) {
       return { status: "failed", target_id: id, error_code: "nothing_held", message: "Rover is not carrying a container." };
     }
@@ -773,17 +781,32 @@ export class HabitatWorld {
     carried.deliveredTo = id;
     const placedId = this.carryId;
     this.carryId = null;
+    logClientEvent("rover.placed", { target_id: placedId, platform_id: id, ...this.getAgentCoordinates() }, context);
     return { status: "succeeded", target_id: id, message: `Placed ${carried.label} on ${platform.label} (${placedId}).` };
   }
 
-  private async walkPath(destination: THREE.Vector3): Promise<ExecutionResult> {
+  private async walkPath(destination: THREE.Vector3, context: LogContext): Promise<ExecutionResult> {
     const path = this.findPath(this.robot.position, destination);
-    if (!path) return { status: "failed", error_code: "unreachable_target", message: "No safe path found." };
-    const token = ++this.movementToken;
-    for (const point of path) {
-      const reached = await this.walkSegment(point, token);
-      if (!reached) return { status: "cancelled", error_code: "cancelled", message: "Movement cancelled." };
+    if (!path) {
+      logClientEvent("rover.unreachable", { destination_x: destination.x, destination_z: destination.z }, context);
+      return { status: "failed", error_code: "unreachable_target", message: "No safe path found." };
     }
+    const token = ++this.movementToken;
+    logClientEvent("rover.path_started", {
+      ...this.getAgentCoordinates(), destination_x: destination.x, destination_z: destination.z,
+      waypoints: path.length, movement_token: token,
+    }, context);
+    for (const [index, point] of path.entries()) {
+      const reached = await this.walkSegment(point, token);
+      if (!reached) {
+        logClientEvent("rover.movement_cancelled", { ...this.getAgentCoordinates(), movement_token: token }, context);
+        return { status: "cancelled", error_code: "cancelled", message: "Movement cancelled." };
+      }
+      logClientEvent("rover.waypoint_reached", {
+        waypoint: index + 1, total: path.length, ...this.getAgentCoordinates(), movement_token: token,
+      }, context);
+    }
+    logClientEvent("rover.path_completed", { ...this.getAgentCoordinates(), movement_token: token }, context);
     return { status: "succeeded", message: "Rover reached its destination." };
   }
 

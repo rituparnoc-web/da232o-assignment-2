@@ -1,9 +1,11 @@
 import asyncio
+import json
 from io import BytesIO
 from base64 import b64encode
 from uuid import uuid4
 
 import httpx
+import pytest
 from PIL import Image
 
 from app.main import create_app
@@ -120,5 +122,54 @@ def test_step_rejects_malformed_image_request():
     payload["image_base64"] = "not base64"
     response = send_request(create_app(Settings(), FakeModel()), "POST", "/step", json=payload)
 
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "invalid_request"
+
+
+def test_decision_logs_are_correlated_and_exclude_image_data(caplog):
+    caplog.set_level("INFO", logger="uvicorn.error.habitat")
+    payload = make_request_payload()
+    response = send_request(create_app(Settings(), FakeModel()), "POST", "/step", json=payload)
+
+    events = [json.loads(record.message) for record in caplog.records if record.name == "uvicorn.error.habitat"]
+    assert [event["event"] for event in events] == ["observation.received", "decision.sent"]
+    assert all(event["request_id"] == payload["request_id"] for event in events)
+    assert events[0]["details"]["instruction"] == payload["instruction"]
+    assert events[1]["details"]["action_id"] == response.json()["action_id"]
+    assert payload["image_base64"] not in caplog.text
+
+
+def test_browser_events_join_server_logs_without_multiline_injection(caplog):
+    caplog.set_level("INFO", logger="uvicorn.error.habitat")
+    entry = {
+        "event": "mission.started", "page_id": str(uuid4()), "sequence": 1,
+        "session_id": str(uuid4()), "occurred_at": "2026-11-12T15:00:00Z",
+        "details": {"instruction": "Deliver blue.\nThen stop.", "source": "not a log source"},
+    }
+    response = send_request(create_app(Settings(), FakeModel()), "POST", "/events", json=entry)
+
+    assert response.status_code == 204
+    record = next(record for record in caplog.records if record.name == "uvicorn.error.habitat")
+    event = json.loads(record.message)
+    assert event["source"] == "web"
+    assert event["session_id"] == entry["session_id"]
+    assert event["sequence"] == 1
+    assert event["details"] == entry["details"]
+    assert "\n" not in record.message
+
+
+@pytest.mark.parametrize("change", [
+    {"details": {"message": "x" * 2001}},
+    {"details": {"nested": {"unexpected": True}}},
+    {"image_base64": "not accepted by this endpoint"},
+    {"event": "injected\nline"},
+])
+def test_browser_event_endpoint_rejects_unbounded_or_unexpected_fields(change):
+    entry = {
+        "event": "ui.message", "page_id": str(uuid4()), "sequence": 1,
+        "occurred_at": "2026-11-12T15:00:00Z", "details": {},
+        **change,
+    }
+    response = send_request(create_app(Settings(), FakeModel()), "POST", "/events", json=entry)
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "invalid_request"

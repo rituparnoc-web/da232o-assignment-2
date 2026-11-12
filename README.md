@@ -6,6 +6,12 @@ The project now uses a browser-based Three.js habitat rather than installing a l
 
 The assignment text names Unity or Unreal. This browser-engine alternative needs instructor acceptance before submission.
 
+### Interactive Interview Guide
+
+Open [the standalone interview field guide](web/public/interview-guide.html) directly in a browser, or visit <http://127.0.0.1:5173/interview-guide.html> while Vite is running. It includes a clickable architecture, component deep dives, interview questions with answer outlines, design alternatives, and implementation limitations. Use **Practice mode**, **Random question**, or **Print / PDF** to study.
+
+The guide is a single self-contained HTML file with no external runtime dependencies. Optional source links open the referenced GitHub snapshot. Vite also copies it into the production build.
+
 ### Prerequisites
 
 - Python 3.12+
@@ -72,9 +78,24 @@ To deliver to the second room, specify `second room`, `room 2`, or `delivery_02`
 
 To require a particular table route while carrying a container to the platform, include `north side of the table`, `south side of the table`, `east side of the table`, or `west side of the table` in the instruction. North is negative Z, south is positive Z, east is positive X, and west is negative X. The route uses the scene's fixed table and obstacle layout.
 
+### Live Mission Logs
+
+The backend's existing Uvicorn output now includes single-line JSON events alongside access logs. The browser forwards its events to `POST /events`, so a live viewer following the backend output also shows:
+
+- Instructions, mission start/end, local cancellation, and verification messages.
+- Browser/API requests, model prompts and replies, validated proposals, inference timings, and errors.
+- Raw model targets versus the effective targets selected by browser policy.
+- Manual commands, rover action results, planned path lengths, reached waypoints and coordinates, pickup/placement, table routes, and door phases.
+
+Use `session_id`, `request_id`, `observation_id`, and `action_id` to follow a decision through execution. Browser events additionally include `page_id`, `sequence`, and `occurred_at`; network delivery can interleave them, so use those fields to reconstruct browser order. Browser-originated events are diagnostic claims, not authoritative execution receipts.
+
+Images/base64 are **not** logged; only image media type and encoded length are recorded. Model reply text and browser string fields are limited to 2,000 characters. Instructions and textual model input/output are visible in the logs: do not enter sensitive information when sharing them. There is no separate database/history service; retention depends on how server output is captured.
+
+Restart the backend after updating Python code, then reload the browser to load the instrumentation. Log-forwarding failures appear in the browser console without interrupting rover control; there is no offline replay queue. The four-row in-app event strip remains a short summary, while the backend stream contains the detailed events. The interview guide describes its pinned earlier source snapshot; this logging section documents the newer behavior.
+
 ### Verification
 
-- 22 backend tests pass.
+- Run the backend suite with `..\.venv\Scripts\python.exe -m pytest` from `backend`.
 - `npm run build` succeeds.
 - Desktop and 375 px mobile layouts render without horizontal overflow.
 - A real browser-to-Ollama run selected `object_01`, moved the rover, delivered the blue tote, and reached `VERIFIED`.
