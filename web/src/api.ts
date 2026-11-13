@@ -50,18 +50,35 @@ export interface LogContext {
 
 export type LogDetails = Record<string, string | number | boolean | null>;
 
+export interface ClientLogEvent extends LogContext {
+  event: string;
+  details: LogDetails;
+  page_id: string;
+  sequence: number;
+  occurred_at: string;
+}
+
+declare global {
+  interface WindowEventMap {
+    "habitat:client-event": CustomEvent<ClientLogEvent>;
+  }
+}
+
 const pageId = crypto.randomUUID();
 let logSequence = 0;
 
 export function logClientEvent(event: string, details: LogDetails = {}, context: LogContext = {}): void {
-  const entry = {
+  const normalizedDetails: LogDetails = {};
+  for (const [key, value] of Object.entries(details)) {
+    normalizedDetails[key] = typeof value === "string" ? value.slice(0, 2000) : value;
+  }
+  const entry: ClientLogEvent = {
     ...context, event,
-    details: Object.fromEntries(Object.entries(details).map(([key, value]) => [
-      key, typeof value === "string" ? value.slice(0, 2000) : value,
-    ])),
+    details: normalizedDetails,
     page_id: pageId,
     sequence: ++logSequence, occurred_at: new Date().toISOString(),
   };
+  window.dispatchEvent(new CustomEvent("habitat:client-event", { detail: entry }));
   console.info("[habitat]", entry);
   void fetch(`${apiBase}/events`, {
     method: "POST",
@@ -86,8 +103,13 @@ export async function requestAction(body: StepRequest, signal: AbortSignal): Pro
     session_id: body.session_id, request_id: body.request_id, observation_id: body.observation_id,
   };
   logClientEvent("web.request", {
-    instruction: body.instruction, image_base64_chars: body.image_base64.length,
-    visible_target_count: body.visible_targets.length, held_object_id: body.held_object_id,
+    instruction: body.instruction, image_media_type: body.image_media_type,
+    image_base64_chars: body.image_base64.length, visible_target_count: body.visible_targets.length,
+    visible_targets: body.visible_targets.map((target) =>
+      `${target.target_id} (${target.category}, ${target.in_interaction_range ? "in range" : "out of range"})`
+    ).join(", ") || "none",
+    held_object_id: body.held_object_id,
+    previous_action_result: body.previous_action_result ? JSON.stringify(body.previous_action_result) : null,
   }, context);
   try {
     const response = await fetch(`${apiBase}/step`, {

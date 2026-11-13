@@ -2,7 +2,7 @@
 
 ## Browser 3D Prototype
 
-The project now uses a browser-based Three.js habitat rather than installing a local game engine. The rover can navigate around obstacles, pick up containers, place them on a delivery platform, and be controlled manually or through a real Qwen2.5-VL request. The browser captures the live WebGL canvas and sends it to the Python API.
+The project now uses a browser-based Three.js habitat rather than installing a local game engine. The rover can navigate around obstacles, pick up containers, and place them on a delivery platform through a real Qwen2.5-VL request. The browser captures the live WebGL canvas and sends it to the Python API.
 
 The assignment text names Unity or Unreal. This browser-engine alternative needs instructor acceptance before submission.
 
@@ -72,9 +72,9 @@ Invoke-RestMethod http://127.0.0.1:8000/health
 
 The result should show `model_ready: true`. `POST /step` accepts the strict image-bearing observation contract. Set `VITE_API_BASE_URL` to change the browser API address. The backend only allows the two localhost Vite origins by default.
 
-The **Ask VLM** action captures the current scene and sends it with the instruction, visible IDs/categories, interaction-range flags, carry state, and previous result. A validated `pick_up` proposal selects the target; the browser controller then performs a bounded approach/pickup/delivery sequence and independently verifies the scene. The **Manual dispatch** buttons and rover steering provide a deterministic control path for testing.
+The **Ask VLM** action captures the current scene and sends it with the instruction, visible IDs/categories, interaction-range flags, carry state, and previous result. A validated `pick_up` proposal selects the target; the browser controller then performs a bounded approach/pickup/delivery sequence and independently verifies the scene. **Stop** cancels the local mission. The mission log shows the instruction, observation summary, validated VLM proposal, controller decision, and rover events. Drag or scroll over the scene to orbit or zoom the camera.
 
-To deliver to the second room, specify `second room`, `room 2`, or `delivery_02` in the instruction. The rover approaches and opens the initially closed door before entering, and delivery is verified against that room's platform. Without a room designation, the original platform remains the default. For manual delivery, select the desired platform in the scene registry before using **Navigate** and **Place**.
+To deliver to the second room, specify `second room`, `room 2`, or `delivery_02` in the instruction. The rover approaches and opens the initially closed door before entering, and delivery is verified against that room's platform. Without a room designation, the original platform remains the default.
 
 To require a particular table route while carrying a container to the platform, include `north side of the table`, `south side of the table`, `east side of the table`, or `west side of the table` in the instruction. North is negative Z, south is positive Z, east is positive X, and west is negative X. The route uses the scene's fixed table and obstacle layout.
 
@@ -85,13 +85,13 @@ The backend's existing Uvicorn output now includes single-line JSON events along
 - Instructions, mission start/end, local cancellation, and verification messages.
 - Browser/API requests, model prompts and replies, validated proposals, inference timings, and errors.
 - Raw model targets versus the effective targets selected by browser policy.
-- Manual commands, rover action results, planned path lengths, reached waypoints and coordinates, pickup/placement, table routes, and door phases.
+- Rover action results, planned path lengths, reached waypoints and coordinates, pickup/placement, table routes, and door phases.
 
 Use `session_id`, `request_id`, `observation_id`, and `action_id` to follow a decision through execution. Browser events additionally include `page_id`, `sequence`, and `occurred_at`; network delivery can interleave them, so use those fields to reconstruct browser order. Browser-originated events are diagnostic claims, not authoritative execution receipts.
 
 Images/base64 are **not** logged; only image media type and encoded length are recorded. Model reply text and browser string fields are limited to 2,000 characters. Instructions and textual model input/output are visible in the logs: do not enter sensitive information when sharing them. There is no separate database/history service; retention depends on how server output is captured.
 
-Restart the backend after updating Python code, then reload the browser to load the instrumentation. Log-forwarding failures appear in the browser console without interrupting rover control; there is no offline replay queue. The four-row in-app event strip remains a short summary, while the backend stream contains the detailed events. The interview guide describes its pinned earlier source snapshot; this logging section documents the newer behavior.
+Restart the backend after updating Python code, then reload the browser to load the instrumentation. Log-forwarding failures appear in the browser console without interrupting rover control; there is no offline replay queue. The mission log keeps the latest 200 displayed events for the current tab and clears on reload. It shows the validated proposal, not the backend's raw model prompt or reply text; those remain in the backend stream. The four-row event strip remains a short summary. The interview guide describes its pinned earlier source snapshot, which includes the former manual controls; this README documents the current interface and logging.
 
 ### Verification
 

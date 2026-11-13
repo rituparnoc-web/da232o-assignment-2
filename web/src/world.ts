@@ -20,7 +20,6 @@ interface HabitatTarget {
   groundPosition: THREE.Vector3;
   status: "available" | "held" | "delivered";
   deliveredTo?: string;
-  marker: THREE.Mesh;
 }
 
 const floorLimits = { minX: -6.3, maxX: 13.7, minZ: -4.6, maxZ: 4.6 };
@@ -417,8 +416,6 @@ export class HabitatWorld {
     const labelSprite = makeLabel(id, detail);
     labelSprite.position.set(0, 1.43, 0.18);
     root.add(labelSprite);
-    const marker = this.makeMarker();
-    root.add(marker);
     root.position.set(x, 0, z);
     this.scene.add(root);
     this.targets.set(id, {
@@ -429,7 +426,6 @@ export class HabitatWorld {
       root,
       groundPosition: new THREE.Vector3(x, 0, z),
       status: "available",
-      marker,
     });
   }
 
@@ -465,8 +461,6 @@ export class HabitatWorld {
     const label = makeLabel(id, "DELIVERY / PLATFORM");
     label.position.set(0, 1.34, 0.12);
     root.add(label);
-    const marker = this.makeMarker();
-    root.add(marker);
     root.position.set(x, 0, z);
     this.scene.add(root);
     this.targets.set(id, {
@@ -477,19 +471,7 @@ export class HabitatWorld {
       root,
       groundPosition: new THREE.Vector3(x, 0, z),
       status: "available",
-      marker,
     });
-  }
-
-  private makeMarker(): THREE.Mesh {
-    const marker = new THREE.Mesh(
-      new THREE.RingGeometry(0.72, 0.81, 48),
-      new THREE.MeshBasicMaterial({ color: "#d2f368", side: THREE.DoubleSide, transparent: true, opacity: 0.9 }),
-    );
-    marker.rotation.x = -Math.PI / 2;
-    marker.position.y = 0.035;
-    marker.visible = false;
-    return marker;
   }
 
   private buildRobot(): void {
@@ -597,16 +579,8 @@ export class HabitatWorld {
     return this.carryId;
   }
 
-  getTargetState(id: string): string {
-    return this.targets.get(id)?.status ?? "unknown";
-  }
-
   getAgentCoordinates(): { x: number; z: number } {
     return { x: this.robot.position.x, z: this.robot.position.z };
-  }
-
-  setSelectedTarget(id: string): void {
-    for (const target of this.targets.values()) target.marker.visible = target.id === id;
   }
 
   captureJpeg(): string {
@@ -621,11 +595,6 @@ export class HabitatWorld {
 
   stopMovement(): void {
     this.movementToken += 1;
-  }
-
-  async nudge(dx: number, dz: number, context: LogContext = {}): Promise<ExecutionResult> {
-    const destination = this.robot.position.clone().add(new THREE.Vector3(dx, 0, dz));
-    return this.walkPath(destination, context);
   }
 
   async execute(action: ActionProposal, context: LogContext = {}): Promise<ExecutionResult> {

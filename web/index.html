@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#e8ece7" />
+    <meta name="theme-color" content="#102427" />
     <title>Habitat / VLM Mission Control</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -31,14 +31,6 @@
             <div class="scene-state"><span class="scene-state-light"></span><span id="scene-state">STANDBY</span></div>
           </div>
           <div class="scene-coordinates mono">X <span id="coord-x">-5.0</span><i></i>Z <span id="coord-z">3.5</span></div>
-          <div class="scene-controls" aria-label="Manual movement controls">
-            <span class="control-caption">ROVER STEERING</span>
-            <div class="dpad">
-              <span></span><button id="move-north" aria-label="Move north">N</button><span></span>
-              <button id="move-west" aria-label="Move west">W</button><span class="dpad-center"></span><button id="move-east" aria-label="Move east">E</button>
-              <span></span><button id="move-south" aria-label="Move south">S</button><span></span>
-            </div>
-          </div>
           <div class="viewport-footer mono"><span><b class="key-mark">DRAG</b> ORBIT</span><span><b class="key-mark">SCROLL</b> ZOOM</span><span>CAM 01 <i class="footer-dot"></i> ORBITAL</span></div>
         </section>
 
@@ -55,16 +47,9 @@
           <div class="decision-line"><span>LAST VLM ACTION</span><strong id="last-decision">NO DECISION</strong></div>
 
           <div class="divider"></div>
-          <div class="section-heading"><span class="section-index">02</span><h3>Scene registry</h3><span class="mono registry-count">05 TARGETS</span></div>
-          <div id="target-list" class="target-list"></div>
-
-          <div class="manual-actions">
-            <div class="section-heading compact"><span class="section-index">03</span><h3>Manual dispatch</h3></div>
-            <div class="manual-action-row">
-              <button id="navigate-target" class="button-secondary">NAVIGATE</button>
-              <button id="pickup-target" class="button-secondary">PICK UP</button>
-              <button id="place-target" class="button-secondary">PLACE</button>
-            </div>
+          <div class="section-heading"><span class="section-index">02</span><h3>Mission log</h3><span class="mono log-hint">LAST 200 / THIS TAB</span></div>
+          <div id="mission-log" class="mission-log" role="log" aria-live="off" aria-label="Mission log" tabindex="0">
+            <p class="mission-log-empty">Start a mission to see instructions, VLM replies, and rover events.</p>
           </div>
 
           <div class="panel-bottom">

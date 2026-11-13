@@ -1,4 +1,4 @@
-import { checkApi, logClientEvent, requestAction, type ActionResult, type LogContext, type StepResponse } from "./api";
+import { checkApi, logClientEvent, requestAction, type ActionResult, type ClientLogEvent, type LogContext, type LogDetails, type StepResponse } from "./api";
 import { HabitatWorld, type ExecutionResult, type TableSide } from "./world";
 import "./style.css";
 
@@ -19,8 +19,8 @@ const runButton = byId<HTMLButtonElement>("run-mission");
 const runLabel = byId("run-label");
 const runIcon = byId("run-icon");
 const stopButton = byId<HTMLButtonElement>("stop-mission");
-const targetList = byId("target-list");
-let selectedTarget = "object_01";
+const missionLog = byId("mission-log");
+const maxMissionLogEntries = 200;
 let previousActionResult: ActionResult | null = null;
 let currentAbort: AbortController | null = null;
 let activeRun = 0;
@@ -29,13 +29,90 @@ let liveContext: LogContext = {};
 let lastFailureSignature: string | null = null;
 let repeatedFailureCount = 0;
 
-const targetDetails = [
-  { id: "object_01", name: "Blue tote", detail: "Chromatic polymer / 12kg", color: "#2777de" },
-  { id: "object_02", name: "Red tote", detail: "Thermal seal / 9kg", color: "#e46855" },
-  { id: "object_03", name: "Yellow tote", detail: "Survey kit / 6kg", color: "#e5bf49" },
-  { id: "delivery_01", name: "Delivery platform", detail: "Transfer zone / bay A", color: "#a5cf74" },
-  { id: "delivery_02", name: "Room 2 platform", detail: "Transfer zone / bay B", color: "#a5cf74" },
-];
+function formatLogDetails(details: LogDetails, separator = "\n"): string {
+  return Object.entries(details).map(([key, value]) => {
+    const formatted = typeof value === "number" && !Number.isInteger(value) ? value.toFixed(2) : value;
+    return `${key.replace(/_/g, " ")}: ${formatted ?? "none"}`;
+  }).join(separator);
+}
+
+function describeMissionEvent(entry: ClientLogEvent): { label: string; message: string; tone: string } | null {
+  const { event, details } = entry;
+  if (event === "mission.started" || event === "mission.rejected") {
+    return { label: "INSTRUCTION", message: formatLogDetails(details), tone: "instruction" };
+  }
+  if (event === "web.request") {
+    return { label: "VLM / REQUEST", message: formatLogDetails(details), tone: "request" };
+  }
+  if (event === "web.response") {
+    return { label: "VLM / RESPONSE", message: formatLogDetails(details), tone: "response" };
+  }
+  if (event === "decision.applied") {
+    const target = details.target_id ? ` → ${details.target_id}` : "";
+    const override = details.target_overridden === true
+      ? `\nTarget changed from ${details.raw_target_id ?? "none"} by the instruction rule.`
+      : "";
+    return { label: "CONTROLLER / ACTION", message: `${details.action}${target}${override}`, tone: "controller" };
+  }
+  if (event === "rover.phase") {
+    return { label: "ROVER / PHASE", message: String(details.phase), tone: "rover" };
+  }
+  if (event === "rover.waypoint_reached") {
+    const x = typeof details.x === "number" ? details.x.toFixed(2) : details.x;
+    const z = typeof details.z === "number" ? details.z.toFixed(2) : details.z;
+    return { label: "ROVER / WAYPOINT", message: `${details.waypoint}/${details.total} · X ${x}, Z ${z}`, tone: "rover" };
+  }
+  if (event.startsWith("rover.")) {
+    return { label: `ROVER / ${event.slice(6).replace(/_/g, " ").toUpperCase()}`, message: formatLogDetails(details, " · "), tone: "rover" };
+  }
+  if (event === "ui.message") {
+    if (details.kind === "is-model") return null;
+    if (details.kind === "is-success" && typeof details.message === "string" && !details.message.startsWith("Task verified:")) return null;
+    if (details.message === "Local stop issued. Late decisions will be ignored.") return null;
+    const tone = details.kind === "is-error" ? "error" : details.kind === "is-success" ? "success" : "system";
+    return { label: tone.toUpperCase(), message: String(details.message), tone };
+  }
+  if (event === "web.request_failed" && details.cancelled === true) {
+    return { label: "VLM / CANCELLED", message: "Stopped waiting for the response; model inference may continue.", tone: "system" };
+  }
+  if (event === "web.request_failed" || event === "decision.stale") {
+    return { label: "ERROR", message: formatLogDetails(details), tone: "error" };
+  }
+  if (event === "mission.cancelled") {
+    return { label: "MISSION / CANCELLED", message: "Local stop issued. Late decisions will be ignored.", tone: "system" };
+  }
+  if (event === "mission.ended") {
+    return { label: "MISSION / ENDED", message: formatLogDetails(details, " · "), tone: "system" };
+  }
+  return null;
+}
+
+function appendMissionLog(entry: ClientLogEvent): void {
+  const presentation = describeMissionEvent(entry);
+  if (!presentation) return;
+  const follow = missionLog.scrollHeight - missionLog.scrollTop - missionLog.clientHeight < 24;
+  missionLog.querySelector(".mission-log-empty")?.remove();
+
+  const row = document.createElement("div");
+  row.className = `mission-log-entry is-${presentation.tone}`;
+  const meta = document.createElement("div");
+  meta.className = "mission-log-meta";
+  const label = document.createElement("strong");
+  label.textContent = presentation.label;
+  const sequence = document.createElement("span");
+  sequence.textContent = `#${entry.sequence}`;
+  const time = document.createElement("time");
+  time.dateTime = entry.occurred_at;
+  time.textContent = new Date(entry.occurred_at).toLocaleTimeString([], { hour12: false });
+  meta.append(label, sequence, time);
+  const message = document.createElement("div");
+  message.className = "mission-log-message";
+  message.textContent = presentation.message;
+  row.append(meta, message);
+  missionLog.append(row);
+  while (missionLog.children.length > maxMissionLogEntries) missionLog.firstElementChild?.remove();
+  if (follow) missionLog.scrollTop = missionLog.scrollHeight;
+}
 
 function logEvent(message: string, kind = "normal", context: LogContext = liveContext): void {
   logClientEvent("ui.message", { message, kind }, context);
@@ -70,48 +147,6 @@ function syncWorldReadout(): void {
   byId("coord-z").textContent = coordinates.z.toFixed(1);
   const held = world.getHeldObjectId();
   roverState.textContent = held ? `CARRYING / ${held}` : "PARKED / EMPTY";
-  for (const detail of targetDetails) {
-    const state = world.getTargetState(detail.id);
-    const stateElement = document.querySelector<HTMLElement>(`[data-target-state="${detail.id}"]`);
-    if (stateElement) stateElement.textContent = state.toUpperCase();
-    const row = document.querySelector<HTMLElement>(`[data-target-id="${detail.id}"]`);
-    row?.classList.toggle("is-delivered", state === "delivered");
-    row?.classList.toggle("is-held", state === "held");
-  }
-}
-
-function renderTargetRegistry(): void {
-  targetList.replaceChildren();
-  for (const [index, target] of targetDetails.entries()) {
-    const button = document.createElement("button");
-    button.className = `target-row${target.id === selectedTarget ? " is-selected" : ""}`;
-    button.type = "button";
-    button.dataset.targetId = target.id;
-    const swatch = document.createElement("span");
-    swatch.className = "target-swatch";
-    swatch.style.setProperty("--swatch", target.color);
-    const copy = document.createElement("span");
-    copy.className = "target-copy";
-    const name = document.createElement("strong");
-    name.textContent = target.name;
-    const sub = document.createElement("small");
-    sub.textContent = `${target.id} / ${target.detail}`;
-    copy.append(name, sub);
-    const state = document.createElement("span");
-    state.className = "target-state mono";
-    state.dataset.targetState = target.id;
-    state.textContent = world.getTargetState(target.id).toUpperCase();
-    const number = document.createElement("span");
-    number.className = "target-number mono";
-    number.textContent = String(index + 1).padStart(2, "0");
-    button.append(swatch, copy, state, number);
-    button.addEventListener("click", () => {
-      selectedTarget = target.id;
-      world.setSelectedTarget(target.id);
-      renderTargetRegistry();
-    });
-    targetList.append(button);
-  }
 }
 
 function formatAction(result: StepResponse): string {
@@ -148,18 +183,6 @@ function expectedTargetFor(text: string): string {
 function expectedPlatformFor(text: string): string {
   return /\b(?:second|2nd)\s+(?:room|delivery\s+platform|platform)\b|\broom\s*(?:2|02|two)\b|\b(?:delivery_02|other room)\b/i.test(text)
     ? "delivery_02" : "delivery_01";
-}
-
-async function doManualAction(action: { action: "navigate_to" | "pick_up" | "place_on"; target_id: string }): Promise<void> {
-  if (running) return;
-  const context = { action_id: crypto.randomUUID() };
-  logClientEvent("manual.action", { action: action.action, target_id: action.target_id }, context);
-  setSceneStatus(action.action, true);
-  const result = await world.execute(action, context);
-  logExecutionResult(result, context);
-  syncWorldReadout();
-  logEvent(result.message, result.status === "failed" ? "is-error" : "is-success", context);
-  setSceneStatus(result.status === "succeeded" ? "standby" : result.error_code ?? "standby");
 }
 
 async function runMission(): Promise<void> {
@@ -360,35 +383,6 @@ function stopMission(): void {
   liveContext = {};
 }
 
-function bindManualControls(): void {
-  byId("navigate-target").addEventListener("click", () => {
-    const descriptor = world.getVisibleTargets().find((target) => target.target_id === selectedTarget);
-    if (descriptor) void doManualAction({ action: "navigate_to", target_id: selectedTarget });
-  });
-  byId("pickup-target").addEventListener("click", () => {
-    void doManualAction({ action: "pick_up", target_id: selectedTarget });
-  });
-  byId("place-target").addEventListener("click", () => {
-    void doManualAction({ action: "place_on", target_id: selectedTarget.startsWith("delivery_") ? selectedTarget : "delivery_01" });
-  });
-  const movement: Array<[string, number, number]> = [
-    ["move-north", 0, -0.9], ["move-south", 0, 0.9], ["move-west", -0.9, 0], ["move-east", 0.9, 0],
-  ];
-  for (const [id, dx, dz] of movement) {
-    byId(id).addEventListener("click", async () => {
-      if (running) return;
-      const context = { action_id: crypto.randomUUID() };
-      logClientEvent("manual.nudge", { dx, dz }, context);
-      setSceneStatus("manual move", true);
-      const result = await world.nudge(dx, dz, context);
-      logExecutionResult(result, context);
-      syncWorldReadout();
-      if (result.status === "failed") logEvent(result.message, "is-error", context);
-      setSceneStatus("standby");
-    });
-  }
-}
-
 async function updateApiStatus(): Promise<void> {
   try {
     const health = await checkApi();
@@ -400,9 +394,7 @@ async function updateApiStatus(): Promise<void> {
   }
 }
 
-renderTargetRegistry();
-world.setSelectedTarget(selectedTarget);
-bindManualControls();
+window.addEventListener("habitat:client-event", (event) => appendMissionLog(event.detail));
 runButton.addEventListener("click", () => void runMission());
 stopButton.addEventListener("click", stopMission);
 void updateApiStatus();

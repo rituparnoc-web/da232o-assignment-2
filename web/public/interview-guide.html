@@ -166,6 +166,7 @@
     </aside>
     <main id="content" tabindex="-1">
       <div class="breadcrumb"><span class="eyebrow" id="breadcrumb"></span><span class="reading-meta" id="reading-meta"></span></div>
+      <div class="callout"><strong>Earlier source snapshot</strong><p>This guide describes snapshot <code>dd885dd</code>. The current app uses a VLM-only mission interface with a live mission log; manual rover steering and dispatch have been removed.</p></div>
       <div id="article"></div>
       <nav class="bottom-nav" id="bottom-nav" aria-label="Previous and next component"></nav>
       <footer>Source snapshot <code>dd885dd</code> / Prepared 12 November 2026. This is a local simulation prototype, not a production robotics platform.</footer>
@@ -764,7 +765,7 @@
           ${overview ? `<div class="section-heading"><h2>Vocabulary checkpoint</h2></div><div class="card"><dl class="glossary">${glossary.map(([term, definition]) => `<div><dt>${escapeHtml(term)}</dt><dd>${escapeHtml(definition)}</dd></div>`).join("")}</dl></div><div class="callout"><strong>A useful answer structure</strong><p>Requirement &rarr; implementation mechanism &rarr; invariant &rarr; trade-off &rarr; evidence &rarr; next improvement. Say "implemented", "documented historically", or "proposed" deliberately.</p></div>` : ""}
           <div class="section-heading"><h2>Read the implementation</h2><span class="eyebrow">Evidence, not inference</span></div>
           <ul class="source-list">${sourceLinks}</ul>
-          <p class="source-note">Optional links open the exact source snapshot on GitHub (repository access may be required). The learning material is embedded here and works offline. PLAN.md is cited for intentions; implemented behavior is checked against source. Tests observed during preparation: 22 backend cases passed.</p>
+          <p class="source-note">Optional links open the exact source snapshot on GitHub (repository access may be required). The learning material is embedded here and works offline. The current app no longer exposes manual rover controls. PLAN.md is cited for intentions; implemented behavior is checked against the snapshot. Tests observed during preparation: 22 backend cases passed.</p>
         </div>
       </article>`;
     }
