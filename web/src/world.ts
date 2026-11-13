@@ -24,6 +24,11 @@ interface HabitatTarget {
 
 const floorLimits = { minX: -6.3, maxX: 13.7, minZ: -4.6, maxZ: 4.6 };
 const cellSize = 0.5;
+const containerScale = 0.7;
+const containerBodyHeight = 0.78;
+const containerBodyCenterY = 0.44;
+const platformPadHeight = 0.08;
+const platformPadCenterY = 0.43;
 
 function shadow(mesh: THREE.Mesh): THREE.Mesh {
   mesh.castShadow = true;
@@ -197,6 +202,16 @@ export class HabitatWorld {
     this.addRoomDetails();
     this.addWallStorage(5.1);
     this.addWallStorage(10.85);
+    this.addFloorCase(-6.25, -0.25, "#b883ce");
+    this.addFloorCanister(-6.25, -2.0, "#58beb5");
+    this.addFloorCase(1.3, -4.65, "#e98e69");
+    this.addFloorCanister(5.2, 3.95, "#e6a14e");
+    this.addFloorCanister(6.0, 3.95, "#77b3ce");
+    this.addFloorCase(8.85, -4.2, "#86b878");
+    this.addFloorCase(12.1, -4.25, "#b995d5");
+    this.addFloorCanister(13.4, -1.45, "#d77da8");
+    this.addFloorCanister(13.4, -0.65, "#eaa35e");
+    this.addFloorCanister(13.4, 0.15, "#5abdb3");
   }
 
   private addWallStorage(x: number): void {
@@ -372,6 +387,54 @@ export class HabitatWorld {
     }
   }
 
+  private addFloorCase(x: number, z: number, color: string): void {
+    const group = new THREE.Group();
+    group.name = "floor-case";
+    const bodyMaterial = new THREE.MeshStandardMaterial({ color, roughness: 0.68, metalness: 0.2 });
+    const trimMaterial = new THREE.MeshStandardMaterial({ color: "#a7bba2", roughness: 0.55, metalness: 0.35 });
+    const body = shadow(new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.46, 0.64), bodyMaterial));
+    body.position.y = 0.23;
+    group.add(body);
+    const lid = shadow(new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.08, 0.68), trimMaterial));
+    lid.position.y = 0.5;
+    group.add(lid);
+    for (const offset of [-0.24, 0.24]) {
+      const band = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.43, 0.02), trimMaterial);
+      band.position.set(offset, 0.23, 0.33);
+      group.add(band);
+    }
+    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.05, 0.06), bodyMaterial);
+    handle.position.set(0, 0.565, 0);
+    group.add(handle);
+    group.position.set(x, 0, z);
+    this.scene.add(group);
+    this.obstacles.push({ minX: x - 0.43, maxX: x + 0.43, minZ: z - 0.34, maxZ: z + 0.34 });
+  }
+
+  private addFloorCanister(x: number, z: number, color: string): void {
+    const group = new THREE.Group();
+    group.name = "floor-canister";
+    const bodyMaterial = new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.28 });
+    const trimMaterial = new THREE.MeshStandardMaterial({ color: "#48635d", roughness: 0.52, metalness: 0.4 });
+    const body = shadow(new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.7, 20), bodyMaterial));
+    body.position.y = 0.35;
+    group.add(body);
+    for (const height of [0.14, 0.57, 0.72]) {
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.05, 20), trimMaterial);
+      band.position.y = height;
+      group.add(band);
+    }
+    const valve = shadow(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.14, 12), trimMaterial));
+    valve.position.y = 0.815;
+    group.add(valve);
+    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.04, 0.06), bodyMaterial);
+    grip.position.y = 0.9;
+    group.add(grip);
+    group.position.set(x, 0, z);
+    this.scene.add(group);
+    this.obstacles.push({ minX: x - 0.3, maxX: x + 0.3, minZ: z - 0.3, maxZ: z + 0.3 });
+  }
+
   private addWallMarkings(): void {
     const wallText = makeLabel("HABITAT 04", "LOW GRAVITY / STORAGE BAY");
     wallText.position.set(-3.85, 2.0, -5.16);
@@ -388,31 +451,34 @@ export class HabitatWorld {
   }
 
   private buildTargets(): void {
-    this.addContainer("object_01", "Blue tote", "#2777de", "BLUE / CONTAINER", -4.45, -2.75);
-    this.addContainer("object_02", "Red tote", "#e46855", "RED / CONTAINER", -2.75, -2.75);
-    this.addContainer("object_03", "Yellow tote", "#e5bf49", "YELLOW / CONTAINER", -1.05, -2.75);
+    this.addContainer("object_01", "Blue tote", "#2777de", "BLUE / CONTAINER", -5.1, -2.75);
+    this.addContainer("object_02", "Red tote", "#e46855", "RED / CONTAINER", -3.4, -2.75);
+    this.addContainer("object_03", "Yellow tote", "#e5bf49", "YELLOW / CONTAINER", -1.7, -2.75);
     this.addPlatform("delivery_01", 4.55, -2.75);
     this.addPlatform("delivery_02", 11.2, 2.75);
   }
 
   private addContainer(id: string, label: string, color: string, detail: string, x: number, z: number): void {
     const root = new THREE.Group();
+    const container = new THREE.Group();
+    container.scale.setScalar(containerScale);
+    root.add(container);
     const bodyMaterial = new THREE.MeshStandardMaterial({ color, roughness: 0.44, metalness: 0.08 });
-    const body = shadow(new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.78, 0.88), bodyMaterial));
-    body.position.y = 0.44;
-    root.add(body);
+    const body = shadow(new THREE.Mesh(new THREE.BoxGeometry(1.08, containerBodyHeight, 0.88), bodyMaterial));
+    body.position.y = containerBodyCenterY;
+    container.add(body);
     const lid = shadow(new THREE.Mesh(
       new THREE.BoxGeometry(1.14, 0.12, 0.94),
       new THREE.MeshStandardMaterial({ color: new THREE.Color(color).multiplyScalar(0.74), roughness: 0.5 }),
     ));
     lid.position.y = 0.87;
-    root.add(lid);
+    container.add(lid);
     const seam = shadow(new THREE.Mesh(
       new THREE.BoxGeometry(0.055, 0.62, 0.03),
       new THREE.MeshStandardMaterial({ color: "#d7e3cf", roughness: 0.55 }),
     ));
     seam.position.set(0, 0.46, 0.453);
-    root.add(seam);
+    container.add(seam);
     const labelSprite = makeLabel(id, detail);
     labelSprite.position.set(0, 1.43, 0.18);
     root.add(labelSprite);
@@ -436,10 +502,10 @@ export class HabitatWorld {
     base.position.y = 0.22;
     root.add(base);
     const pad = shadow(new THREE.Mesh(
-      new THREE.BoxGeometry(1.64, 0.08, 1.32),
+      new THREE.BoxGeometry(1.64, platformPadHeight, 1.32),
       new THREE.MeshStandardMaterial({ color: "#a5cf74", roughness: 0.66, emissive: "#243b12", emissiveIntensity: 0.2 }),
     ));
-    pad.position.y = 0.43;
+    pad.position.y = platformPadCenterY;
     root.add(pad);
     for (const [px, pz] of [[-0.8, -0.64], [0.8, -0.64], [-0.8, 0.64], [0.8, 0.64]]) {
       const post = shadow(new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.42, 0.11), frameMaterial));
@@ -744,7 +810,8 @@ export class HabitatWorld {
     this.robot.remove(carried.root);
     this.scene.add(carried.root);
     carried.root.position.copy(platform.groundPosition);
-    carried.root.position.y = 0.52;
+    carried.root.position.y = platformPadCenterY + platformPadHeight / 2
+      - (containerBodyCenterY - containerBodyHeight / 2) * containerScale;
     carried.root.rotation.set(0, 0, 0);
     carried.status = "delivered";
     carried.deliveredTo = id;

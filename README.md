@@ -4,6 +4,8 @@
 
 The project now uses a browser-based Three.js habitat rather than installing a local game engine. The rover can navigate around obstacles, pick up containers, and place them on a delivery platform through a real Qwen2.5-VL request. The browser captures the live WebGL canvas and sends it to the Python API.
 
+Both rooms include colorful decorative floor cases and canisters, which the rover routes around.
+
 The assignment text names Unity or Unreal. This browser-engine alternative needs instructor acceptance before submission.
 
 ### Interactive Interview Guide
